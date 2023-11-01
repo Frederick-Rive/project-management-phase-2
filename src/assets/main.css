@@ -1,0 +1,107 @@
+/*@import './base.css';
+
+* { 
+  background-color: #fff;
+  margin: 0px;
+  padding: 0px;
+}
+
+p {
+  background-color: #E2FAF4; 
+  padding: 5px; 
+  font-size: 18px; 
+  text-align: centre;
+}
+
+h1 {
+  font-size: 100px;
+}
+
+#grid-container {
+  display: grid;
+  grid-template-columns: 15% 85%;
+}
+
+#left-bar {
+   background-color: #E2FAF4;
+   padding: 0px;
+   height: 892px;
+   margin: 0px;
+}
+
+#login > label {
+  padding: 0;
+  background-color: inherit;
+}
+
+#login > input {
+  margin: 0 0 0 64%;
+  width: 30%;
+  border: none;
+  height: 30px;
+}
+
+#login > button {
+  margin: auto;
+  background-color: #79EBC6; 
+  border: none; 
+  color: #000;
+  padding: 5px;
+  border-radius: 5px;
+}
+
+#heading { 
+  background-color: #E2FAF4;
+  padding: 0px;
+  height: 64px;
+  margin: 0px;
+  padding: 0px 0px 0px 15%;
+  display: none;
+}
+
+#heading > button { 
+  background-color: #79EBC6; 
+  border: none; 
+  color: #000;
+  display: inline;
+  height: 100%;
+  width: 300px;
+  text-align: center;
+  font-size: 32px;
+}
+
+#heading > button:hover {
+  background-color: #419E81; 
+  cursor:pointer;
+}
+
+#kanban-board {
+  display: none; /* grid 
+  padding: 20px;
+  grid-template-columns: auto auto auto;
+}
+
+.kanban-column {
+  padding: 10%;
+  align-content: center;
+  list-style-type: none;
+}
+
+.kanban-column-header {
+  background-color: #79EBC6;
+  font-size: 34px;
+  color: #000;
+  text-align: center;
+  padding: 5px;
+  height: 40px;
+}
+
+.kanban-widget {
+  background-color: #79EBC6;
+  height: 100px;
+  border-radius: 5px;
+  padding: 15px;
+  font-size: 30px;
+  width: 90%;
+  margin: 20px 1% 0 1%;
+}*/
