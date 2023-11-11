@@ -30,12 +30,14 @@ mongoose.connect('mongodb+srv://Freddie-RIve:LGmw1XzE4hhnzgg7@project-management
     });
 
 const Account = require('./models/account.js');
-//const UserAccess = require('./models/useraccess.js');
 const Log = require('./models/log.js');
 const Task = require('./models/task.js');   
 const Project = require('./models/project.js');
 
 var user = new Account();
+var perm = 0;
+// replace with an actual project system, if you have the time
+var project = "6490b3a858f110c790acb03e";
 
 //gets an account based on its ID
 app.get('/account', async (req, res) => {
@@ -43,16 +45,23 @@ app.get('/account', async (req, res) => {
     var account = await findAccount(req.query.u, req.query.h);
     if (account) {
       user = account;
+      perm = await checkPerm(user._id);
 
-      //logging action ~~~!!! turn back on and make a way to not send when the user is refreshing !!!~~~
-      //postLog(null, 'Logged In');
+      //logging action
+      postLog(null, 'Logged In');
       
       res.send("1");
     } else {
       res.send("0");
     }
-  }
-  else {
+  } else if (req.query.id && req.query.id != "{}") {
+    var account = await findAccountWithID(req.query.id);
+    if (account) {
+        res.send(account);
+    } else {
+      res.send('Error: Could not find account with ID');
+    }
+  } else {
     res.send("0");
   }
 });
@@ -83,7 +92,6 @@ app.get('/usertasks', async (req, res) => {
 
 app.post('/task', async (req, res) => {
   let body = req.body;
-  console.log(body);
   var newTask = new Task({
     _id: new mongoose.Types.ObjectId,
     name: body.name,
@@ -108,20 +116,17 @@ app.patch('/task', async (req, res) => {
 })
 
 app.post('/account', async (req, res) => {
-  let body = JSON.parse(req.body);
-  console.log(body);
-  var accTest = await checkAccount(req.query.u);
+  var accTest = await checkAccount(req.body.n);
   if (accTest) {
     console.log("Name Taken");
     res.send('0');
   } else {
       var newAccount = new Account({
         _id: new mongoose.Types.ObjectId,
-        username: body.n,
-        password: body.h,
+        username: req.body.n,
+        password: req.body.h,
         email: null,
       });
-      console.log(newAccount);
 
       //logging action
       postLog(null, 'Register');
@@ -142,7 +147,6 @@ app.get('/project', async (req, res) => {
   }
   else {
     var task = await findTask();
-    console.log(task);
     res.send("0");
   }
 });
@@ -157,28 +161,33 @@ app.get('/useraccount', async (req, res) => {
 
 //gets an account based on its ID
 app.get('/user', async (req, res) => {
-  if (user && user != '0') {
-    res.send(user);
+  res.send(user);
+});
+
+app.get('/uP', async (req, res) => {
+  if (user._id != null && user._id != undefined) {
+    res.send(perm.toString());
   } else {
-    res.send(user);
+    res.send("0");
   }
 });
 
-app.get('account', async (req, res) => {
-  if (req.query.id && req.query.id != "{}") {
-    var account = await findAccountWithID(req.query.id);
-    if (task) {
-        res.send(task);
-    } else {
-      res.send('Error: Could not find task with ID');
-    }
+app.get('/projectlogs',  async (req, res) => {
+  var logs = await findProjectLogs();
+  if (logs) {
+    res.send(logs);
   } else {
-    res.send('0');
+    res.send("0");
   }
 });
 
-app.get('/log', async (req, res) => {
-
+app.get('/projectusers', async (req, res) => {
+  var users = await findProjectUsers();
+  if (users) {
+    res.send(users);
+  } else {
+    res.send("0");
+  }
 });
 
 app.post('/log', async (req, res) => {
@@ -186,7 +195,7 @@ app.post('/log', async (req, res) => {
 
   var newLog = new Log({
     _id: new mongoose.Types.ObjectId,
-    user:  user,
+    user:  user._id,
     task: body.task,
     action: body.action
   });
@@ -203,7 +212,7 @@ function findAccount(uName, pHash) {
   return Account.findOne({ username: uName, password: pHash })
   .exec()
   .then((accountResult) => {
-    console.log(accountResult);
+    console.log(accountResult.perm);
     return (accountResult);
   })
   .catch((err) => {
@@ -215,7 +224,6 @@ function findAccountWithID(id) {
   return Account.findOne({ "_id": id })
   .exec()
   .then((accountResult) => {
-    console.log(accountResult);
     return (accountResult);
   })
   .catch((err) => {
@@ -247,7 +255,6 @@ function findAccountNoUname() {
 
 function findTask(id) { 
   //queries databse for task
-  console.log(id);
   return Task.findOne(qObj(id))
   .exec()
   .then((taskResult) => {
@@ -265,19 +272,8 @@ function findTask(id) {
   })
 }
 
-function postLog(task, action) {
-  var newLog = new Log({
-    _id: new mongoose.Types.ObjectId,
-    user:  user,
-    task: task,
-    action: action
-  });
-  newLog.save();
-}
-
 function findUserTasks() {
-  console.log(user._id);
-  return Task.find({"users": user._id})
+  return Task.find(qObj(0))
   .exec()
   .then((taskResult) => {
     return taskResult;
@@ -287,9 +283,97 @@ function findUserTasks() {
   })
 }
 
+function findLog(id) {
+  //queries database for log
+  return Log.findOne(id)
+  .exec()
+  .then((logResult) => {
+    //if a log is returned, send log to application
+    if (logResult != null) {
+      return logResult;
+    } else {
+      //otherwise, send a 0 to show that nothing was returned
+      return "0";
+    }
+  })
+  .catch((err) => {
+    //if connection failed, return error message
+    return ("Error: " + err);
+  })
+}
+
+function findProjectLogs() {
+  //queries database for logs
+  return Log.find()
+  .exec()
+  .then((logResult) => {
+    //if a logs are returned, send logs to application
+    if (logResult != null) {
+      return logResult;
+    } else {
+      //otherwise, send a 0 to show that nothing was returned
+      return "0";
+    }
+  })
+  .catch((err) => {
+    //if connection failed, return error message
+    return ("Error: " + err);
+  })
+}
+
+function findProjectUsers() {
+  let rtrn = [];
+  return Account.find()
+  .exec()
+  .then((accountResult) => {
+    if (accountResult != null) {
+      for (let account of accountResult) {
+        rtrn.push({
+          _id: account._id,
+          username: account.username
+        })
+      }
+      return rtrn;
+    }
+  })
+  .catch((err) => {
+    //if connection failed, return error message
+    return ("Error: " + err);
+  })
+}
+
+function postLog(task, action) {
+  var newLog = new Log({
+    _id: new mongoose.Types.ObjectId,
+    user:  user._id,
+    task: task,
+    action: action
+  });
+  newLog.save();
+}
+
 function qObj (id) {
   let rtrn = {};
-  rtrn["_id"] = id;
-  rtrn["users"] = user._id;
+  if (id != 0) {
+    rtrn["_id"] = id;
+  }
+  if (!perm) {
+    console.log('aa');
+    rtrn["users"] = user._id;
+  }
   return rtrn;
+}
+
+function checkPerm (id) {
+  return Project.find({"_id": project, "admin": id})
+  .exec()
+  .then((projectResult) => {
+    if (projectResult != null) {
+      return 1;
+    }
+    return 0;
+  })
+  .catch((err) => {
+    return 0;
+  })
 }

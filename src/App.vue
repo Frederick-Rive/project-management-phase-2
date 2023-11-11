@@ -1,64 +1,105 @@
 <template>
   <main>
 
+    <div id="login-back">
+      <form id="login">
+        <label for="username">Username</label>
+        <input id="username" v-model="username"  />
+        <br><br>
+        <label for="password">Password</label>
+        <input id="password" v-model="password" />
+        <br><br><br><br>
+        <input id="log-in" type="submit" value="Log In" style="width: 35%; background-color: #79EBC6; border: none; font-size: 18px; cursor: pointer; margin-left: 10%;" @click.prevent="login">
+        <input id="register" type="submit" value="Register" style="width: 35%; background-color: #79EBC6; border: none; font-size: 18px; cursor: pointer;  margin-left: 10%;" @click.prevent="register">
+      </form>
+    </div>
+
     <div id="heading">
-        <button>Kanban Board</button>
-        <button>Gannt Chart</button>
-        <button>Admin Screen</button>
+        <button @click="openKanbanBoard">Kanban Board</button>
+        <button @click="openGanttChart">Gantt Chart</button>
+        <button @click="openAdminScreen">Admin Screen</button>
     </div>
 
     <div id="modal-back" v-on:click.self="closeModal"> 
+      <div id="modal-task">
+        <form v-if="activeTask.name !== undefined" @submit.prevent="SaveTask">
+          <input class="modal-input" style="font-size: 35px; width: 50%;" v-model="activeTask.name" />
 
-        <div id="modal-task" style="  background-image: url(&quot;/static/7dd122ae-ee2c-4d61-b6e4-e1ac2eab973e.jpg&quot;);">
-          <form v-if="activeTask.name !== undefined" @submit.prevent="SaveTask">
-            <input class="modal-input" style="font-size: 35px; width: 50%;" v-model="activeTask.name" />
+          <input class="modal-input" type="date" style="font-size: 18px; width: 18%; background-color: #79EBC6;"  v-model="activeTask.startDate" />
+          <input class="modal-input" type="date" style="font-size: 18px; width: 18%; background-color: #79EBC6;"  v-model="activeTask.endDate" />
+          <br>
+          <br>
+          <textarea  class="modal-input" style="font-size: 18px; width: 95%; height: 95px; " v-model="activeTask.description" />
+          
+          <br><br>
+          <hr>
+          <br>
 
-            <input class="modal-input" type="date" style="font-size: 18px; width: 18%; background-color: #79EBC6;"  v-model="activeTask.startDate" />
-            <input class="modal-input" type="date" style="font-size: 18px; width: 18%; background-color: #79EBC6;"  v-model="activeTask.endDate" />
-            <br>
-            <br>
-            <textarea  class="modal-input" style="font-size: 18px; width: 95%; height: 95px; " v-model="activeTask.description" />
-            
-            <br><br>
-            <hr>
-            <br>
+          <li v-for="user in activeTask.userNames" style="height: 135px;">
+            <div class="modal-link"> {{user}} </div>
+          </li>
+          
+          <input id="submit" type="submit" style="position: relative; left: 90%; background-color: #79EBC6; border: none; padding: 5px; border-radius: 5px; font-size: 18px; cursor: pointer;">
+        </form>
+      </div>
 
-            <li v-for="user in activeTask.userNames" style="height: 135px;">
-              <div class="modal-link"> {{user}} </div>
+      <div id="modal-user" v-if="activeUser.username !== undefined">
+        <div style="padding-right: 5%;">
+          <h1>{{activeUser.username}}</h1>
+
+          <h2 style="margin-top: 20px">Logs</h2>
+          <hr style="border: 1px solid #000">
+
+          <div style="max-height: 300px; overflow: hidden scroll; white-space: nowrap;">
+
+            <li v-for="log in activeUser.logs" id="modal-user-logs">
+              <div class="log-action">{{log.action}}</div>
+              <button class="log-button" @click.prevent="openTaskModal(task)"> {{log.taskName}} </button> 
+              <div class="log-timestamp">{{`${log.createdAt.split('T')[0]} ${log.createdAt.split('T')[1].split('.')[0]}pm`}}</div>
             </li>
-            
-            <input id="submit" type="submit" style="position: relative; left: 90%; background-color: #79EBC6; border: none; padding: 5px; border-radius: 5px; font-size: 18px; cursor: pointer;">
-          </form>
+
+          </div>
         </div>
+
+        <div>
+          <h2 style="margin-top: 78px">
+            Tasks
+            <button class="modal-link" style="border: none; position: relative; bottom: 5px; left: 40%;" @click.prevent="openTaskListWidget()">Add</button>
+          </h2>
+          <hr style="border: 1px solid #000">
+
+          <li v-for="task in activeUser.tasks">
+            <div class="modal-task-widget" @click.self="openTaskModal(task)">
+              <p>{{task.name}}</p>
+              <div class="task-remove" @click.prevent="removeTaskAccess(task)">Remove</div>
+            </div>
+          </li>
+          
+        </div>
+      </div>
+
+      <div id="modal-task-list">
+        <div style="max-height: 300px; overflow: hidden scroll; white-space: nowrap;">
+          <li v-for="task in tasks">
+            <div class="task-list-element" @click.prevent="grantTaskAccess(task)">{{task.name}}</div>
+          </li>
+        </div>
+      </div>
     </div>
 
-    
     <div id="grid-container">
       <div id="left-bar">
 
-
-      {{positions}}
       </div>
 
-      <form id="login" @submit.prevent="login">
-        <label for="uname">Username</label>
-        <input v-model="username"  />
-        <br><br>
-        <label for="pword">Password</label>
-        <input v-model="password" />
-        <br><br>
-        <input id="log-in" type="submit" value="Log In">
-        <p id="login-response"></p>
-      </form>
+      <div id="kanban-board" ref="kanbanboard">
 
-      <div id="kanban-board">
-
-        <div class="kanban-column" id="todo-column"> 
+        <div class="kanban-column" id="todo-column" ref="todocolumn"> 
           <div class="kanban-column-header">To Do</div>
 
           <div style="max-height: 700px; overflow-y: scroll;  overflow-x: hidden; white-space: nowrap;">
             <li v-for="item in todo">
-              <div class="kanban-widget" v-on:click="openTaskModal(item)" @mousedown="dragMouseDown">{{tasks[item].name}}</div>
+              <div class="kanban-widget" :ref='"task"+item' :id='"task"+item' @click="openTaskModal(item)" @mousedown="dragMouseDown($event, `task${item}`)">{{tasks[item].name}}</div>
             </li>
           </div>
 
@@ -66,22 +107,69 @@
 
         </div>
 
-        <div class="kanban-column" id="progress-column"> 
+        <div class="kanban-column" id="progress-column" ref="progresscolumn"> 
           <div class="kanban-column-header">In Progress</div>     
 
-          <li v-for="item in inprogress" style="max-height: 750px; overflow: auto;  white-space: nowrap;">
-            <div class="kanban-widget" v-on:click="openTaskModal(item)" @mousedown="dragMouseDown">{{tasks[item].name}}</div>
-          </li>
+          <div style="max-height: 700px; overflow-y: scroll;  overflow-x: hidden; white-space: nowrap;">
+            <li v-for="item in inprogress">
+              <div class="kanban-widget" :ref='"task"+item' :id='"task"+item' @click="openTaskModal(item)" @mousedown="dragMouseDown($event, `task${item}`)">{{tasks[item].name}}</div>
+            </li>
+          </div>
         </div>
 
-        <div class="kanban-column" id="complete-column"> 
+        <div class="kanban-column" id="complete-column" ref="completecolumn"> 
           <div class="kanban-column-header">Completed</div>
 
-          <li v-for="item in completed" style="max-height: 750px; overflow: auto;  white-space: nowrap;">
-            <div class="kanban-widget" v-on:click="openTaskModal(item)" @mousedown="dragMouseDown">{{tasks[item].name}}</div>
-          </li>
+          <div style="max-height: 700px; overflow-y: scroll;  overflow-x: hidden; white-space: nowrap;">
+            <li v-for="item in completed">
+              <div class="kanban-widget" :ref='"task"+item' :id='"task"+item' @click="openTaskModal(item)" @mousedown="dragMouseDown($event, `task${item}`)">{{tasks[item].name}}</div>
+            </li>
+          </div>
         </div>
 
+      </div>
+
+      <div id="admin-screen" ref="adminscreen"> 
+
+        <div style="padding-right: 10%;">
+          <h1>Project Title</h1>
+
+          <h2 style="margin-top: 60px">Backups</h2>
+          <hr style="border: 1px solid #000">
+          <button> Save Project State </button>
+          <button> Restore Project State </button>
+
+          <h2 style="margin-top: 120px">Logs</h2>
+          <hr style="border: 1px solid #000">
+          
+          <div id="log-display">
+            <li v-for="log in logs">
+              <button class="log-button"> {{log.userName}} </button> 
+              <div class="log-action">{{log.action}}</div>
+              <button class="log-button"> {{log.taskName}} </button> 
+              <div class="log-timestamp">{{`${log.createdAt.split('T')[0]} ${log.createdAt.split('T')[1].split('.')[0]}pm`}}</div>
+            </li>
+          </div>
+          
+        </div>
+
+        <div>
+          <h1>Users</h1>
+
+          <h2 style="margin-top: 60px">Admin</h2>
+          <hr style="border: 1px solid #000">
+
+          <li v-for="account in accounts">
+            <div class="account-widget" @click="openUserModal(account)">
+              <div class="pfp"></div>
+              <p>{{account.username}}</p>
+              <div class="account-remove">Remove</div>
+            </div>
+          </li>
+
+          <h2 style="margin-top: 60px">Members</h2>
+          <hr style="border: 1px solid #000">
+        </div>
       </div>
           
     </div>
@@ -89,7 +177,7 @@
 </template>
 
 <script>
-import { onMounted } from 'vue';
+import { ref, onMounted } from 'vue'
 import axios from 'axios';
     
   const lifetime = 50000;
@@ -101,23 +189,34 @@ import axios from 'axios';
       return {
         username: 'test',
         password: 'test',
+        logs: [],
         tasks: [],
         todo: [],
         inprogress: [],
         completed: [],
+        accounts: [],
         activeTask: {},
+        activeUser: {},
         account: null,
+        uP: 0,
         showLogin: "none",
         showHeading: "none",
         showKanban: "none",
+        showGantt: "none",
+        showAdmin: "none",
         showModalBack: "none",
         showModalTask: "none",
+        showModalUser: "none",
+        showModalTaskList: "none",
         positions: {
           clientX: undefined,
           clientY: undefined,
           movementX: 0,
-          movementY: 0
-        }
+          movementY: 0,
+          activeRef: undefined,
+          relativeX: 0,
+          relativeY: 0,
+        },
       }
     },
     mounted() {
@@ -139,8 +238,17 @@ import axios from 'axios';
       }
     },
     methods:  {
+      reloadData () {
+        getUserTasks();
+        getProjectLogs();
+        getProjectUsers();
+      },
+
       async getUserTasks() {
         this.tasks = [];
+        this.todo = [];
+        this.inprogress = []
+        this.completed = [];
         let response = await fetch(`http://localhost:6069/usertasks`);
         let taskArr = await response.json();
         for (let task of taskArr) {
@@ -178,17 +286,76 @@ import axios from 'axios';
           if (!localStorage.getItem('lifeStart')) {
             localStorage.setItem('lifeStart', Date.now());
           }
-          this.showHeading = "block";
-          this.showKanban = "grid";
-          this.showLogin = "none";
+          this.openKanbanBoard();
           this.getUserTasks();
+
+          response = await fetch(`http://localhost:6069/uP`);
+          this.uP = await response.json();
+
+          if (this.uP) {
+            this.getProjectLogs();
+            this.getProjectUsers();
+          }
         } else {
-          this.showHeading = "none";
-          this.showKanban = "none";
-          this.showLogin = "block";
+          this.openLogin();
         }
       },
+
+      async register() {
+        let requestOptions = {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              n: this.username,
+              h: this.password
+            })
+          };
+
+        let response = await fetch(`http://localhost:6069/account`, requestOptions);
+        this.account = await response.json();
+        if (this.account) {
+          if (!localStorage.getItem('lifeStart')) {
+            localStorage.setItem('lifeStart', Date.now());
+          }
+          this.openKanbanBoard();
+          this.getUserTasks();
+        } else {
+          this.openLogin();
+        }
+      },
+
+      openLogin() {
+        this.showHeading = "none";
+        this.showKanban = "none";
+        this.showLogin = "block";
+        this.showGantt = "none";
+        this.showAdmin = "none";
+      },
+
+      openKanbanBoard() {
+        this.showHeading = "block";
+        this.showKanban = "grid";
+        this.showLogin = "none";
+        this.showGantt = "none";
+        this.showAdmin = "none";
+      },
       
+      openGanttChart() {
+        this.showHeading = "block";
+        this.showKanban = "none";
+        this.showLogin = "none";
+        this.showGantt = "none";
+        this.showAdmin = "none";
+      },
+
+      openAdminScreen() {
+        this.showHeading = "block";
+        this.showKanban = "none";
+        this.showLogin = "none";
+        this.showGantt = "none";
+        this.showAdmin = "grid"
+      },
+
       async checkForAccount() {
         let response = await fetch(`http://localhost:6069/useraccount`);
         let hasAccount = await response.json();
@@ -198,6 +365,16 @@ import axios from 'axios';
           this.showKanban = "grid";
           this.showLogin = "none";
           this.getUserTasks();
+
+          
+          response = await fetch(`http://localhost:6069/uP`);
+          this.uP = await response.json();
+
+          if (this.uP) {
+            this.getProjectLogs();
+            this.getProjectUsers();
+          }
+
         } else {
           this.showHeading = "none";
           this.showKanban = "none";
@@ -205,7 +382,7 @@ import axios from 'axios';
         }
       },
 
-      async SaveTask() {
+      async SaveTask(keepModalOpen = false) {
         let requestOptions = {};
         if (this.activeTask._id != null && this.activeTask._id != undefined) {
           requestOptions = {
@@ -223,28 +400,115 @@ import axios from 'axios';
         let response = await fetch('http://localhost:6069/task', requestOptions);
         let data = await response.json();
 
-        this.closeModal();
-        this.getUserTasks();
+        if (!keepModalOpen) {
+          this.closeModal();
+        }
+        this.reloadData();
       },
 
-      openTaskModal(index) {
-        if (index != null && index != undefined) {
-          this.activeTask = this.tasks[index];
+      async getProjectLogs() {
+        let response = await fetch(`http://localhost:6069/projectlogs`);
+        let l = await response.json();
 
+        let logDict = {};
+        for (let task of this.tasks) {
+          logDict.task._id = task.name;
+        }
+        
+        for (let log of l) {
+          if (logDict[log.task]) {
+            log.taskName = logDict[log.task];
+          } else {
+            let response = await fetch(`http://localhost:6069/task?id=${log.task}`);
+            let task = await response.json();
+            if (task) {
+              log.taskName = task.name;
+              logDict[log.task] = task.name;
+            } else {
+              continue;
+            }
+          }
+
+          if (logDict[log.user]) {
+            log.userName = logDict[log.user];
+          } else {
+            let response = await fetch(`http://localhost:6069/account?id=${log.user}`);
+            let acc = await response.json();
+            log.userName = acc.username
+          }
+
+          this.logs.push(log);
+        }
+      },
+
+      async getProjectUsers() {
+        let response = await fetch(`http://localhost:6069/projectusers`);
+        this.accounts = await response.json();
+      },
+
+      openTaskModal(task) {
+        if (typeof task == "object") {
+          this.activeTask = task;
           this.activeTask.userNames = [];
           this.getTaskUsers();
         } else {
-          this.activeTask = {
-            "name": "",
-            "description": "",
-            "startDate": "",
-            "endDate": "",
-            "state": "To Do"
+          if (task != null && task != undefined) {
+            this.activeTask = this.tasks[task];
+            this.activeTask.userNames = [];
+            this.getTaskUsers();
+          } else {
+            this.activeTask = {
+              "name": "",
+              "description": "",
+              "startDate": "",
+              "endDate": "",
+              "state": "To Do"
+            }
+          }
+        }
+
+          this.showModalBack = "block";
+          this.showModalTask = "block";
+      },
+
+      openUserModal(account) {
+        this.activeUser = account;
+        this.activeUser.logs = [];
+        this.activeUser.tasks = [];
+
+        for (let log of this.logs) {
+          if (log.user == this.activeUser._id) {
+            this.activeUser.logs.push(log);
+          }
+        }
+
+        for (let task of this.tasks) {
+          if (task.users.includes(this.activeUser._id)) {
+            this.activeUser.tasks.push(task);
           }
         }
 
         this.showModalBack = "block";
-        this.showModalTask = "block";
+        this.showModalUser = "grid";
+      },
+
+      openTaskListWidget() {
+        this.showModalTaskList = (this.showModalTaskList == "none") ? "block" : "none";
+      },
+
+      grantTaskAccess(task) {
+        this.activeTask = task;
+        this.activeTask.users.push(this.activeUser._id);
+        this.SaveTask(true);
+        this.openTaskListWidget();
+        this.reloadData();
+      },
+
+      removeTaskAccess(task) {
+        this.activeTask = task;
+        this.activeTask.users.splice(this.activeTask.users.indexOf(this.activeUser._id), 1);
+        this.SaveTask(true);
+        this.reloadData();
       },
 
       async getTaskUsers() {
@@ -260,32 +524,76 @@ import axios from 'axios';
 
         this.showModalBack = "none";
         this.showModalTask = "none";
+        this.showModalUser = "none";
       },
 
-      dragMouseDown: function (event) {
+      dragMouseDown: function (event, ref) {
         event.preventDefault();
         event.target.id = "draggable-container";
-        console.log(event.target);
+        this.activeRef = ref;
+
+        let taskNo = Number(this.activeRef.replace('task', ''));
+        this.activeTask = this.tasks[taskNo];
+
         // get the mouse cursor position at startup:
-        this.positions.clientX = event.clientX
-        this.positions.clientY = event.clientY
-        document.onmousemove = this.elementDrag
-        document.onmouseup = this.closeDragElement(event)
+        this.positions.clientX = event.clientX;
+        this.positions.clientY = event.clientY;
+
+        this.positions.relativeX = event.clientX - this.$refs[this.activeRef][0].offsetLeft;
+        this.positions.relativeY = event.clientY - this.$refs[this.activeRef][0].offsetTop;
+
+        document.onmousemove = this.elementDrag;
+        document.onmouseup = this.closeDragElement;
       },
+
       elementDrag: function (event) {
-        event.preventDefault()
+        event.preventDefault();
         this.positions.movementX = this.positions.clientX - event.clientX
         this.positions.movementY = this.positions.clientY - event.clientY
         this.positions.clientX = event.clientX
         this.positions.clientY = event.clientY
         // set the element's new position:
-        this.$refs.draggableContainer.style.top = (this.$refs.draggableContainer.offsetTop - this.positions.movementY) + 'px'
-        this.$refs.draggableContainer.style.left = (this.$refs.draggableContainer.offsetLeft - this.positions.movementX) + 'px'
+
+        this.$refs[this.activeRef][0].style.top = (this.positions.clientY - this.positions.relativeY) + 'px';
+        this.$refs[this.activeRef][0].style.left = (this.positions.clientX - this.positions.relativeX) + 'px';
       },
-      closeDragElement (event) {
-        event.target.id="";
-        document.onmouseup = null
-        document.onmousemove = null
+
+      closeDragElement () {
+        document.onmouseup = null;
+        document.onmousemove = null;
+
+        let taskNo = Number(this.activeRef.replace('task', ''));
+        
+        let prevState = this.activeTask.state;
+
+        switch(prevState) {
+          case "To Do":
+            this.todo.splice(this.todo.indexOf(taskNo), 1);
+            break;
+          case "In Progress":
+            this.inprogress.splice(this.inprogress.indexOf(taskNo), 1);
+            break;
+          case "Completed":
+            this.completed.splice(this.completed.indexOf(taskNo), 1);
+            break;
+        }
+
+        if (this.positions.clientX < this.$refs.progresscolumn.getBoundingClientRect().left) {
+          this.todo.push(taskNo);
+          this.activeTask.state = "To Do";
+        } else if (this.positions.clientX < this.$refs.completecolumn.getBoundingClientRect().left) {
+          this.inprogress.push(taskNo);
+          this.activeTask.state = "In Progress";
+        } else {
+          this.completed.push(taskNo);
+          this.activeTask.state = "Completed";
+        }
+
+        this.SaveTask();
+
+        this.$refs[this.activeRef][0].id = undefined;
+        this.$refs[this.activeRef][0].style.top = '';
+        this.$refs[this.activeRef][0].style.left = '';
       },
     },
   }
@@ -311,11 +619,16 @@ h1 {
   font-weight: normal;
 }
 
+h2 {
+  font-size: 40px;
+  font-weight: normal;
+}
+
 #modal-back {
   background-color: rgba(231, 236, 239, 63%);
   width: 85%;
   height: 892px;
-  z-index: 2;
+  z-index: 10;
   position: absolute;
   left: 15%;
   top: 64px;
@@ -329,7 +642,7 @@ h1 {
   border-radius: 25px;
   padding: 10px;
   display: v-bind("showModalTask");
-  z-index: 3;
+  z-index: 11;
 }
 
 .modal-input {
@@ -353,6 +666,72 @@ h1 {
   padding: 5px;
 }
 
+#modal-user {
+  width: 750px;
+  height: 430px;
+  margin: 200px auto;
+  border-radius: 25px;
+  padding: 10px;
+  display: v-bind("showModalUser");
+  grid-template-columns: 60% 40%;
+  z-index: 11;
+}
+
+#modal-user > h1 {
+  font-size: 35px;
+}
+
+.modal-task-widget {
+  background-color: #79EBC6;
+  width: 90%;
+  margin: 10px auto;
+  padding: 4px;
+  border-radius: 30px;
+  display: grid;
+  grid-template-columns: 70% 30%;
+}
+
+.modal-task-widget > p {
+  background-color: inherit;
+  border-radius: inherit;
+  padding: 6px;
+  font-size: 16px;
+  overflow: hidden; 
+  white-space: nowrap;
+}
+
+.task-remove {
+  background-color: #EB8FAA;
+  font-size: 14px;
+  padding: 6.5px 1px 0 12px;
+  border-radius: inherit;
+  width: 80%;
+  display: inline;
+}
+
+#modal-task-list {
+  width: 250px;
+  height: 430px;
+  border-radius: 25px;
+  padding: 10px;
+  position: relative;
+  bottom: 645px;
+  left: 75%;
+  display: v-bind("showModalTaskList");
+  z-index: 11;
+}
+
+.task-list-element {
+  font-size: 18px;
+  background-color: #79EBC6; 
+  border-radius: 5px; 
+  overflow: hidden; 
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  padding: 5px;
+  margin: 5px 0;
+}
+
 #grid-container {
   display: grid;
   grid-template-columns: 15% 85%;
@@ -364,27 +743,41 @@ h1 {
    padding: 0px;
    height: 892px;
    margin: 0px;
+   display: v-bind("showHeading");
+}
+
+#login-back {
+  display: v-bind("showLogin");
+  margin: 0; 
+  height: 956px; 
+  width: 100%; 
+  padding-top: 300px;
+  background-color: rgba(231, 236, 239, 63%);
 }
 
 #login {
   display: v-bind("showLogin");
-  width: 70%;
-  height: 250px;
+  width: 30%;
+  height: 200px;
   margin: auto;
-  background-color: #E2FAF4;
+  background-color: #fff;
   padding: 1%;
+  border-radius: 15px;
 }
 
 #login > label {
   padding: 0;
   background-color: inherit;
+  display: inline;
 }
 
 #login > input {
-  margin: 0 0 0 64%;
-  width: 30%;
-  border: none;
+  margin: 0 0 0 10%;
+  width: 70%;
   height: 30px;
+  padding: 1px 5px;
+  border: 1px solid #333;
+  border-radius: 10px;
 }
 
 #login > button {
@@ -470,8 +863,127 @@ h1 {
 
 #draggable-container {
   position: absolute;
-  z-index: 5;
+  z-index: 2;
+  width: 20%
 }
+
+#admin-screen {
+  display: v-bind("showAdmin");
+  padding: 20px 2% 0 2%;
+  grid-template-columns: 66% 33%;
+  table-layout: fixed;
+}
+
+#log-display {
+  max-height: 500px; 
+  overflow: hidden scroll; 
+  white-space: nowrap;
+}
+
+.log-action {
+  width: 10%;
+  display: inline-block;
+  overflow: hidden; 
+  text-overflow: ellipsis;
+  text-align: center;
+}
+
+#modal-user-logs > .log-action {
+  width: 20%;
+  display: inline-block;
+  overflow: hidden; 
+  text-overflow: ellipsis;
+  text-align: center;
+}
+
+
+.log-button {
+  padding: 5px;
+  font-size: 15px;
+  border-radius: 5px;
+  border: none;
+  background-color: #79EBC6;
+  margin: 5px;
+  width: 20%;
+  text-align: left;
+  overflow: hidden; 
+  text-overflow: ellipsis;
+}
+
+#modal-user-logs > .log-button {
+  padding: 5px;
+  font-size: 15px;
+  border-radius: 5px;
+  border: none;
+  background-color: #79EBC6;
+  margin: 5px;
+  width: 30%;
+  text-align: left;
+  overflow: hidden; 
+  text-overflow: ellipsis;
+}
+
+.log-timestamp {
+  display: inline-block;
+  width: 45%;
+  overflow: hidden; 
+  text-overflow: ellipsis;
+  text-align: right;
+}
+
+#modal-user-logs > .log-timestamp {
+  display: inline-block;
+  width: 45%;
+  overflow: hidden; 
+  text-overflow: ellipsis;
+  text-align: right;
+}
+
+#log-display > ::-webkit-scrollbar {
+  width: 0px;
+}
+
+#log-display > ::-webkit-scrollbar-track {
+  border-radius: 10px;
+}
+
+#log-display > ::-webkit-scrollbar-thumb {
+  background: #79EBC6;
+  border-radius: 10px;
+}
+
+.account-widget {
+  background-color: #79EBC6;
+  width: 90%;
+  margin: 10px auto;
+  padding: 5px;
+  border-radius: 30px;
+  display: grid;
+  grid-template-columns: 10% 72% 18%;
+}
+
+.account-widget > p {
+  background-color: inherit;
+  padding: 6px;
+  font-size: 24px;
+}
+
+.account-widget > .pfp {
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  background-color: #eee;
+}
+
+.account-remove {
+  background-color: #EB8FAA;
+  font-size: 18px;
+  padding: 10px 5px 0 5px;
+  border-radius: inherit;
+  width: 80%;
+  display: inline;
+}
+
 </style>
 
 <style scoped></style>

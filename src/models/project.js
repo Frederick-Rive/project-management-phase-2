@@ -7,7 +7,8 @@ const projectSchema = new mongoose.Schema({
     users : [mongoose.Schema.Types.ObjectId],
     tasks : [mongoose.Schema.Types.ObjectId],
     startDate : [Number],
-    endDate : [Number]
+    endDate : [Number],
+    admin: [mongoose.Schema.Types.ObjectId],
 }, {
     versionKey: false,
     strict: true,
