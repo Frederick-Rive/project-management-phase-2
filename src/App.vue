@@ -99,7 +99,7 @@
 
           <div style="max-height: 700px; overflow-y: scroll;  overflow-x: hidden; white-space: nowrap;">
             <li v-for="item in todo">
-              <div class="kanban-widget" :ref='"task"+item' :id='"task"+item' @click="openTaskModal(item)" @mousedown="dragMouseDown($event, `task${item}`)">{{tasks[item].name}}</div>
+              <div class="kanban-widget" :ref='"task"+item' :id='"task"+item' @mousedown="dragMouseDown($event, `task${item}`)">{{tasks[item].name}}</div>
             </li>
           </div>
 
@@ -112,7 +112,7 @@
 
           <div style="max-height: 700px; overflow-y: scroll;  overflow-x: hidden; white-space: nowrap;">
             <li v-for="item in inprogress">
-              <div class="kanban-widget" :ref='"task"+item' :id='"task"+item' @click="openTaskModal(item)" @mousedown="dragMouseDown($event, `task${item}`)">{{tasks[item].name}}</div>
+              <div class="kanban-widget" :ref='"task"+item' :id='"task"+item' @mousedown="dragMouseDown($event, `task${item}`)">{{tasks[item].name}}</div>
             </li>
           </div>
         </div>
@@ -122,7 +122,7 @@
 
           <div style="max-height: 700px; overflow-y: scroll;  overflow-x: hidden; white-space: nowrap;">
             <li v-for="item in completed">
-              <div class="kanban-widget" :ref='"task"+item' :id='"task"+item' @click="openTaskModal(item)" @mousedown="dragMouseDown($event, `task${item}`)">{{tasks[item].name}}</div>
+              <div class="kanban-widget" :ref='"task"+item' :id='"task"+item' @mousedown="dragMouseDown($event, `task${item}`)">{{tasks[item].name}}</div>
             </li>
           </div>
         </div>
@@ -216,6 +216,8 @@ import axios from 'axios';
           activeRef: undefined,
           relativeX: 0,
           relativeY: 0,
+          startX: 0,
+          startY: 0,
         },
       }
     },
@@ -239,9 +241,9 @@ import axios from 'axios';
     },
     methods:  {
       reloadData () {
-        getUserTasks();
-        getProjectLogs();
-        getProjectUsers();
+        this.getUserTasks();
+        this.getProjectLogs();
+        this.getProjectUsers();
       },
 
       async getUserTasks() {
@@ -529,18 +531,13 @@ import axios from 'axios';
 
       dragMouseDown: function (event, ref) {
         event.preventDefault();
-        event.target.id = "draggable-container";
-        this.activeRef = ref;
 
+        this.activeRef = ref;
         let taskNo = Number(this.activeRef.replace('task', ''));
         this.activeTask = this.tasks[taskNo];
 
-        // get the mouse cursor position at startup:
-        this.positions.clientX = event.clientX;
-        this.positions.clientY = event.clientY;
-
-        this.positions.relativeX = event.clientX - this.$refs[this.activeRef][0].offsetLeft;
-        this.positions.relativeY = event.clientY - this.$refs[this.activeRef][0].offsetTop;
+        this.positions.startX = event.clientX;
+        this.positions.startY = event.clientY;
 
         document.onmousemove = this.elementDrag;
         document.onmouseup = this.closeDragElement;
@@ -548,6 +545,18 @@ import axios from 'axios';
 
       elementDrag: function (event) {
         event.preventDefault();
+
+        if (event.target.id == this.activeRef && Math.abs(this.positions.startX - event.clientX) + Math.abs(this.positions.startY - event.clientY) > 10) {
+          event.target.id = "draggable-container";
+
+          // get the mouse cursor position at startup:
+          this.positions.clientX = event.clientX;
+          this.positions.clientY = event.clientY;
+
+          this.positions.relativeX = event.clientX - this.$refs[this.activeRef][0].offsetLeft;
+          this.positions.relativeY = event.clientY - this.$refs[this.activeRef][0].offsetTop; 
+        }
+
         this.positions.movementX = this.positions.clientX - event.clientX
         this.positions.movementY = this.positions.clientY - event.clientY
         this.positions.clientX = event.clientX
@@ -562,34 +571,56 @@ import axios from 'axios';
         document.onmouseup = null;
         document.onmousemove = null;
 
+        console.log(this.activeTask);
+        console.log(this.positions.clientX + " | " + this.positions.clientY)
         let taskNo = Number(this.activeRef.replace('task', ''));
         
         let prevState = this.activeTask.state;
 
-        switch(prevState) {
-          case "To Do":
-            this.todo.splice(this.todo.indexOf(taskNo), 1);
-            break;
-          case "In Progress":
-            this.inprogress.splice(this.inprogress.indexOf(taskNo), 1);
-            break;
-          case "Completed":
-            this.completed.splice(this.completed.indexOf(taskNo), 1);
-            break;
-        }
-
+        let newState;
         if (this.positions.clientX < this.$refs.progresscolumn.getBoundingClientRect().left) {
-          this.todo.push(taskNo);
-          this.activeTask.state = "To Do";
+          newState = "To Do";
         } else if (this.positions.clientX < this.$refs.completecolumn.getBoundingClientRect().left) {
-          this.inprogress.push(taskNo);
-          this.activeTask.state = "In Progress";
+          newState = "In Progress";
         } else {
-          this.completed.push(taskNo);
-          this.activeTask.state = "Completed";
+          newState = "Completed";
         }
 
-        this.SaveTask();
+        console.log(newState + " | " + prevState)
+        if (newState != prevState) {
+          switch(prevState) {
+            case "To Do":
+              this.todo.splice(this.todo.indexOf(taskNo), 1);
+              break;
+            case "In Progress":
+              this.inprogress.splice(this.inprogress.indexOf(taskNo), 1);
+              break;
+            case "Completed":
+              this.completed.splice(this.completed.indexOf(taskNo), 1);
+              break;
+          }
+
+          switch(newState) {
+            case "To Do":
+              this.todo.push(taskNo);
+              this.activeTask.state = "To Do";
+              break;
+            case "In Progress":
+              this.inprogress.push(taskNo);
+              this.activeTask.state = "In Progress";
+              break;
+            case "Completed":
+              this.completed.push(taskNo);
+              this.activeTask.state = "Completed";
+              break;
+          }
+
+          console.log("save");
+          // this.SaveTask();
+
+        } else {
+          this.openTaskModal(this.activeTask);
+        }
 
         this.$refs[this.activeRef][0].id = undefined;
         this.$refs[this.activeRef][0].style.top = '';
