@@ -13,4 +13,4 @@ const logSchema = new mongoose.Schema({
     timestamps: true
 });
 
-module.exports = mongoose.model('Log', logSchema, 'Log');
+module.exports = logSchema;

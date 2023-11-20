@@ -4,15 +4,12 @@ const mongoose = require('mongoose');
 const projectSchema = new mongoose.Schema({
     _id: mongoose.Schema.Types.ObjectId,
     name : String,
-    users : [mongoose.Schema.Types.ObjectId],
-    tasks : [mongoose.Schema.Types.ObjectId],
-    startDate : [Number],
-    endDate : [Number],
     admin: [mongoose.Schema.Types.ObjectId],
+    backupTimestamp: Date
 }, {
     versionKey: false,
     strict: true,
     strictQuery: false
 });
 
-module.exports = mongoose.model('Project', projectSchema, 'Project');
+module.exports = projectSchema;

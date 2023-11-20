@@ -1,6 +1,7 @@
 //header files
 const mongoose = require("mongoose");
 const express = require("express");
+const CryptoJS = require('crypto-js');
 const app = express();
 const bodyParser = require('body-parser');
 app.use(bodyParser.json({ limit: '20mb' }));
@@ -18,8 +19,7 @@ const storage = multer.diskStorage({
     }
 });
 const upload = multer({ storage: storage });
-const bcrypt = require('bcrypt');
-const salt = 10;
+const cryptkey = '1234567890123456'
 
 //connect to the database
 mongoose.connect('mongodb+srv://Freddie-RIve:LGmw1XzE4hhnzgg7@project-management.h6h4c36.mongodb.net/?retryWrites=true&w=majority')
@@ -29,29 +29,40 @@ mongoose.connect('mongodb+srv://Freddie-RIve:LGmw1XzE4hhnzgg7@project-management
       console.log("Connection Error: " + err)
     });
 
-const Account = require('./models/account.js');
-const Log = require('./models/log.js');
-const Task = require('./models/task.js');   
-const Project = require('./models/project.js');
+//deprecated, left in case we need further testing
+const test = mongoose.createConnection('mongodb+srv://Freddie-RIve:LGmw1XzE4hhnzgg7@project-management.h6h4c36.mongodb.net/test?retryWrites=true&w=majority');
+const prod = mongoose.createConnection('mongodb+srv://Freddie-RIve:LGmw1XzE4hhnzgg7@project-management.h6h4c36.mongodb.net/prod?retryWrites=true&w=majority');
+const backup = mongoose.createConnection('mongodb+srv://Freddie-RIve:LGmw1XzE4hhnzgg7@project-management.h6h4c36.mongodb.net/backup?retryWrites=true&w=majority');
+
+
+const Account = prod.model('Account', require('./models/account.js'), 'Account');
+const Log = prod.model('Log', require('./models/log.js'), 'Log');
+const Task = prod.model('Task', require('./models/task.js'), 'Task');   
+const Project = prod.model('Project', require('./models/project.js'), 'Project');
+
+const LogBackup = backup.model('Log', require('./models/log.js'), 'Log');
+const TaskBackup = backup.model('Task', require('./models/task.js'), 'Task');
 
 var user = new Account();
 var perm = 0;
 // replace with an actual project system, if you have the time
-var project = "6490b3a858f110c790acb03e";
+var project = "655a0ace246914f44324c6e4";
 
 //gets an account based on its ID
 app.get('/account', async (req, res) => {
   if (req.query.u && req.query.u != "{}") {
     var account = await findAccount(req.query.u, req.query.h);
-    if (account) {
+    if (account != "0") {
       user = account;
       perm = await checkPerm(user._id);
+      console.log("perm: " + perm);
 
       //logging action
       postLog(null, 'Logged In');
       
       res.send("1");
     } else {
+      perm = 0;
       res.send("0");
     }
   } else if (req.query.id && req.query.id != "{}") {
@@ -64,6 +75,12 @@ app.get('/account', async (req, res) => {
   } else {
     res.send("0");
   }
+});
+
+app.get('/logout', async (req, res) => {
+  user = new Account();
+  perm = 0;
+  res.send("0");
 });
 
 app.get('/task', async (req, res) => {
@@ -165,7 +182,9 @@ app.get('/user', async (req, res) => {
 });
 
 app.get('/uP', async (req, res) => {
-  if (user._id != null && user._id != undefined) {
+  console.log(user._id);
+  if (user._id != undefined) {
+    console.log(perm);
     res.send(perm.toString());
   } else {
     res.send("0");
@@ -204,16 +223,104 @@ app.post('/log', async (req, res) => {
   res.send(1);
 });
 
+app.get('/backup', async(req, res) => {
+  if (true) {
+    if (req.query.order == "Save") {
+      let tasks = await Task.find();
+      let logs = await Log.find();
+
+      await TaskBackup.deleteMany({});
+      await LogBackup.deleteMany({});
+
+      for (let task of tasks) {
+        let backupTask = new TaskBackup({
+          _id: new mongoose.Types.ObjectId,
+          name: task.name,
+          description: task.description,
+          startDate: task.startDate,
+          endDate: task.endDate,
+          state: task.state,
+          users: task.users
+        });
+
+        backupTask.save();
+      }
+
+      for (let log of logs) {
+        let backupLog = new LogBackup({
+          _id: new mongoose.Types.ObjectId,
+          user: log.user,
+          task: log.task,
+          action: log.action,
+          createdAt: log.createdAt,
+          updatedAt: log.updatedAt
+        });
+
+        backupLog.save();
+      }
+      res.send("1");
+    } else if (req.query.order == "Load") {
+      console.log('aa');
+      let backupTasks = await TaskBackup.find();
+      let backupLogs = await LogBackup.find();
+
+      await Task.deleteMany({});
+      await Log.deleteMany({});
+
+      for (let backupTask of backupTasks) {
+        let task = new Task({
+          _id: new mongoose.Types.ObjectId,
+          name: backupTask.name,
+          description: backupTask.description,
+          startDate: backupTask.startDate,
+          endDate: backupTask.endDate,
+          state: backupTask.state,
+          users: backupTask.users
+        });
+
+        task.save();
+      }
+
+      for (let backupLog of backupLogs) {
+        let log = new Log({
+          _id: new mongoose.Types.ObjectId,
+          user: backupLog.user,
+          task: backupLog.task,
+          action: backupLog.action,
+          createdAt: backupLog.createdAt,
+          updatedAt: backupLog.updatedAt
+        });
+
+        log.save();
+      }
+
+      res.send("1");
+    }
+  } else {
+    res.send("0");
+  }
+})
+
 app.listen(6069, () => {
   console.log("listening on port 6069");
 });
 
 function findAccount(uName, pHash) {
-  return Account.findOne({ username: uName, password: pHash })
+  return Account.find({password: pHash})
   .exec()
   .then((accountResult) => {
-    console.log(accountResult.perm);
-    return (accountResult);
+    for (let account of accountResult) {
+      console.log(`${uName} $$ ${account.username}`)
+      let enteredPlain = CryptoJS.AES.decrypt(uName, cryptkey).toString(CryptoJS.enc.Utf8);
+      let storedPlain = CryptoJS.AES.decrypt(account.username, cryptkey).toString(CryptoJS.enc.Utf8);
+
+      console.log(`${enteredPlain} || ${storedPlain}`)
+      if (enteredPlain == storedPlain) {
+        console.log('yay');
+        return (account);
+      }
+    }
+    return("0");
   })
   .catch((err) => {
     return ("Error: " + err);
@@ -358,17 +465,17 @@ function qObj (id) {
     rtrn["_id"] = id;
   }
   if (!perm) {
-    console.log('aa');
     rtrn["users"] = user._id;
   }
   return rtrn;
 }
 
 function checkPerm (id) {
-  return Project.find({"_id": project, "admin": id})
+  return Project.findOne({"_id": project, "admin": id})
   .exec()
   .then((projectResult) => {
-    if (projectResult != null) {
+    console.log(`Project: ${projectResult}`);
+    if (projectResult._id != null) {
       return 1;
     }
     return 0;

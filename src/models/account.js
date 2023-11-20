@@ -13,4 +13,4 @@ const accountSchema = new mongoose.Schema({
     strictQuery: false
 });
 
-module.exports = mongoose.model('Account', accountSchema, 'Account');
+module.exports = accountSchema;

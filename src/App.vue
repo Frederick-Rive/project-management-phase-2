@@ -17,7 +17,7 @@
     <div id="heading">
         <button @click="openKanbanBoard">Kanban Board</button>
         <button @click="openGanttChart">Gantt Chart</button>
-        <button @click="openAdminScreen">Admin Screen</button>
+        <button @click="openAdminScreen" v-if="uP == 1">Admin Screen</button>
     </div>
 
     <div id="modal-back" v-on:click.self="closeModal"> 
@@ -90,6 +90,7 @@
     <div id="grid-container">
       <div id="left-bar">
 
+        <button id="log-out" @click.self="logout">Log Out</button>
       </div>
 
       <div id="kanban-board" ref="kanbanboard">
@@ -136,8 +137,8 @@
 
           <h2 style="margin-top: 60px">Backups</h2>
           <hr style="border: 1px solid #000">
-          <button> Save Project State </button>
-          <button> Restore Project State </button>
+          <button @click="backup('Save')"> Save Project State </button>
+          <button @click="backup('Load')"> Restore Project State </button>
 
           <h2 style="margin-top: 120px">Logs</h2>
           <hr style="border: 1px solid #000">
@@ -177,8 +178,8 @@
 </template>
 
 <script>
-import { ref, onMounted } from 'vue'
-import axios from 'axios';
+  import { ref, onMounted, createApp } from 'vue'
+  import CryptoJS from 'crypto-js'
     
   const lifetime = 50000;
 
@@ -219,17 +220,26 @@ import axios from 'axios';
           startX: 0,
           startY: 0,
         },
+        cryptkey: '1234567890123456',
       }
     },
+
     mounted() {
+      let plainText = "aaa"
+      let ciphertext = CryptoJS.AES.encrypt(plainText, this.cryptkey).toString();
+
+      plainText = CryptoJS.AES.decrypt(ciphertext, this.cryptkey).toString(CryptoJS.enc.Utf8);
+
       if (localStorage.getItem('lifeStart')) {
+
         // lifetime code allows for the user to remain logged in for a length of time, while forcing them to log back in after.
         let life = Number(localStorage.getItem('lifeStart'));
         if (Date.now() > life + lifetime) {
           localStorage.removeItem('lifeStart');
-          this.showHeading = "none";
-          this.showKanban = "none";
-          this.showLogin = "block";
+          this.username = 'test';
+          this.password = 'test';
+
+          this.logout();
         } else {
           this.checkForAccount();
         }
@@ -260,11 +270,29 @@ import axios from 'axios';
 
       async fetchTask(id) {
         let response = await fetch(`http://localhost:6069/task?id=${id}`);
-        this.tasks.push(await response.json());
+
+        let cryptTask = await response.json();
+        console.log(cryptTask);
+        let decryptTask = {};
+
+        decryptTask._id = cryptTask._id
+        decryptTask.name = CryptoJS.AES.decrypt(cryptTask.name, this.cryptkey).toString(CryptoJS.enc.Utf8);
+        decryptTask.description = CryptoJS.AES.decrypt(cryptTask.description, this.cryptkey).toString(CryptoJS.enc.Utf8);
+        decryptTask.startDate = cryptTask.startDate;
+        decryptTask.endDate = cryptTask.endDate
+        decryptTask.state = CryptoJS.AES.decrypt(cryptTask.state, this.cryptkey).toString(CryptoJS.enc.Utf8);
+
+        console.log(decryptTask);
+
+        this.tasks.push(decryptTask);
 
         let taskIndex = this.tasks.length - 1;
-        this.tasks[taskIndex].startDate = this.tasks[taskIndex].startDate.split('T')[0];
-        this.tasks[taskIndex].endDate = this.tasks[taskIndex].endDate.split('T')[0];
+        if (this.tasks[taskIndex].startDate != null) {
+          this.tasks[taskIndex].startDate = this.tasks[taskIndex].startDate.split('T')[0];
+        }
+        if (this.tasks[taskIndex].endDate != null) {
+          this.tasks[taskIndex].endDate = this.tasks[taskIndex].endDate.split('T')[0];
+        }
 
         switch (this.tasks[taskIndex].state) {
           case "To Do":
@@ -282,9 +310,22 @@ import axios from 'axios';
       },
 
       async login() {
-        let response = await fetch(`http://localhost:6069/account?u=${this.username}&h=${this.password}`);
+        let uCrypt = "";
+        // sometimes the encryption creates a cipher that it cannot decode
+        while (true) {
+          console.log('a');
+          uCrypt = CryptoJS.AES.encrypt(this.username, this.cryptkey).toString();
+          if (!uCrypt.includes("+")) {
+            break;
+          }
+        }
+
+        let pHash = CryptoJS.SHA3(this.password);
+
+        let response = await fetch(`http://localhost:6069/account?u=${uCrypt}&h=${pHash}`);
         this.account = await response.json();
-        if (this.account) {
+        if (this.account == 1) {
+          console.log(this.account);
           if (!localStorage.getItem('lifeStart')) {
             localStorage.setItem('lifeStart', Date.now());
           }
@@ -293,6 +334,7 @@ import axios from 'axios';
 
           response = await fetch(`http://localhost:6069/uP`);
           this.uP = await response.json();
+          console.log(this.uP);
 
           if (this.uP) {
             this.getProjectLogs();
@@ -301,6 +343,13 @@ import axios from 'axios';
         } else {
           this.openLogin();
         }
+      },
+
+      async logout() {
+        let response = await fetch(`http://localhost:6069/logout`);
+        this.account = await response.json();
+        this.reloadData();
+        this.openLogin();
       },
 
       async register() {
@@ -385,18 +434,28 @@ import axios from 'axios';
       },
 
       async SaveTask(keepModalOpen = false) {
+        let encryptedTask = {};
+
+        encryptedTask.name = CryptoJS.AES.encrypt(this.activeTask.name, this.cryptkey).toString();
+        encryptedTask.description = CryptoJS.AES.encrypt(this.activeTask.description, this.cryptkey).toString();
+        encryptedTask.startDate = this.activeTask.startDate;
+        encryptedTask.endDate = this.activeTask.endDate;
+        encryptedTask.state = CryptoJS.AES.encrypt(this.activeTask.state, this.cryptkey).toString();
+        console.log(encryptedTask);
+
         let requestOptions = {};
         if (this.activeTask._id != null && this.activeTask._id != undefined) {
+          encryptedTask._id = this.activeTask._id;
           requestOptions = {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(this.activeTask)
+            body: JSON.stringify(encryptedTask)
           };
         } else {
           requestOptions = {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(this.activeTask)
+            body: JSON.stringify(encryptedTask)
           };
         }
         let response = await fetch('http://localhost:6069/task', requestOptions);
@@ -408,12 +467,19 @@ import axios from 'axios';
         this.reloadData();
       },
 
+      async backup(action) {
+        let response = await fetch(`http://localhost:6069/backup?order=${action}`);
+        console.log(action);
+      },
+
       async getProjectLogs() {
         let response = await fetch(`http://localhost:6069/projectlogs`);
         let l = await response.json();
 
         let logDict = {};
+        console.log('a');
         for (let task of this.tasks) {
+          console.log(task);
           logDict.task._id = task.name;
         }
         
