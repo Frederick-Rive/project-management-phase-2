@@ -4,6 +4,7 @@ const express = require("express");
 const CryptoJS = require('crypto-js');
 const app = express();
 const bodyParser = require('body-parser');
+const nodemailer = require('nodemailer')
 app.use(bodyParser.json({ limit: '20mb' }));
 app.use(bodyParser.text({ limit: '20mb' }));
 app.use(bodyParser.urlencoded({ limit: '20mb', extended: true }));
@@ -20,6 +21,15 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 const cryptkey = '1234567890123456'
+const emailAddress = 'cs203freddierivenoreply@gmail.com'
+
+var emailTransporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: emailAddress,
+    pass: 'rnqs lorj xjln pskn'
+  }
+});
 
 //connect to the database
 mongoose.connect('mongodb+srv://Freddie-RIve:LGmw1XzE4hhnzgg7@project-management.h6h4c36.mongodb.net/?retryWrites=true&w=majority')
@@ -31,9 +41,9 @@ mongoose.connect('mongodb+srv://Freddie-RIve:LGmw1XzE4hhnzgg7@project-management
 
 //deprecated, left in case we need further testing
 const test = mongoose.createConnection('mongodb+srv://Freddie-RIve:LGmw1XzE4hhnzgg7@project-management.h6h4c36.mongodb.net/test?retryWrites=true&w=majority');
+
 const prod = mongoose.createConnection('mongodb+srv://Freddie-RIve:LGmw1XzE4hhnzgg7@project-management.h6h4c36.mongodb.net/prod?retryWrites=true&w=majority');
 const backup = mongoose.createConnection('mongodb+srv://Freddie-RIve:LGmw1XzE4hhnzgg7@project-management.h6h4c36.mongodb.net/backup?retryWrites=true&w=majority');
-
 
 const Account = prod.model('Account', require('./models/account.js'), 'Account');
 const Log = prod.model('Log', require('./models/log.js'), 'Log');
@@ -43,8 +53,10 @@ const Project = prod.model('Project', require('./models/project.js'), 'Project')
 const LogBackup = backup.model('Log', require('./models/log.js'), 'Log');
 const TaskBackup = backup.model('Task', require('./models/task.js'), 'Task');
 
+var userPlaceholder = new Account();
 var user = new Account();
 var perm = 0;
+var twofaCode = "0";
 // replace with an actual project system, if you have the time
 var project = "655a0ace246914f44324c6e4";
 
@@ -52,17 +64,53 @@ var project = "655a0ace246914f44324c6e4";
 app.get('/account', async (req, res) => {
   if (req.query.u && req.query.u != "{}") {
     var account = await findAccount(req.query.u, req.query.h);
-    if (account != "0") {
-      user = account;
-      perm = await checkPerm(user._id);
-      console.log("perm: " + perm);
+    if (account != null) {
+      account.password = null;
+      perm = await checkPerm(account._id);
+      console.log(`Perm: ${perm}`)
 
-      //logging action
-      postLog(null, 'Logged In');
-      
-      res.send("1");
+      if (perm) {
+        userPlaceholder = account;
+        
+        let timestamp = new Date();
+
+        twofaCode = `${randCode()} ${randCode()} ${randCode()}`
+
+        var mailOptions = {
+          from: emailAddress,
+          to: account.email,
+          subject: 'Verification Code',
+          html: `Hi ${CryptoJS.AES.decrypt(userPlaceholder.username, cryptkey).toString(CryptoJS.enc.Utf8)},
+
+          We have received a login attempt at ${timestamp.getHours()}:${timestamp.getMinutes()}
+          
+          If this was you, please enter the code <h1> ${twofaCode} </h1> into the application to confirm your login.
+          
+          If not, we recommend you reset your password ASAP
+          
+          Please do not reply to this email`
+        };
+        
+        emailTransporter.sendMail(mailOptions, function(error, info){
+          if (error) {
+            console.log(error);
+          } else {
+            console.log('Email sent: ' + info.response);
+          }
+        });
+
+        res.send("1");
+      } else {
+        user = account;
+            
+        //logging action
+        postLog(null, 'Logged In');
+        
+        res.send(user);
+      }
     } else {
       perm = 0;
+      console.log('aa');
       res.send("0");
     }
   } else if (req.query.id && req.query.id != "{}") {
@@ -83,10 +131,21 @@ app.get('/logout', async (req, res) => {
   res.send("0");
 });
 
+app.get('/twofa', async (req, res) => {
+  if (req.query.c.replace(/\s/g, '') == twofaCode.replace(/\s/g, '')) {
+    user = userPlaceholder;
+    perm = 1;
+    res.send(user);
+  } else {
+    res.send("0")
+  }
+});
+  
 app.get('/task', async (req, res) => {
   if (req.query.id && req.query.id != "{}") {
     var task = await findTask(req.query.id);
     if (task) {
+        console.log(task);
         res.send(task);
     } else {
       res.send("0");
@@ -133,7 +192,8 @@ app.patch('/task', async (req, res) => {
 })
 
 app.post('/account', async (req, res) => {
-  var accTest = await checkAccount(req.body.n);
+  console.log()
+  var accTest = await checkAccount(req.body.c);
   if (accTest) {
     console.log("Name Taken");
     res.send('0');
@@ -142,7 +202,8 @@ app.post('/account', async (req, res) => {
         _id: new mongoose.Types.ObjectId,
         username: req.body.n,
         password: req.body.h,
-        email: null,
+        email: req.body.e,
+        usernameHash: req.body.c
       });
 
       //logging action
@@ -203,6 +264,11 @@ app.get('/projectlogs',  async (req, res) => {
 app.get('/projectusers', async (req, res) => {
   var users = await findProjectUsers();
   if (users) {
+    for (let i = 0; i < users.length; i++) {
+      let userPerm = await checkPerm (users[i]._id)
+      users[i].perm = userPerm;
+    }
+    console.log(users);
     res.send(users);
   } else {
     res.send("0");
@@ -306,23 +372,13 @@ app.listen(6069, () => {
 });
 
 function findAccount(uName, pHash) {
-  return Account.find({password: pHash})
+  return Account.findOne({usernameHash: uName, password: pHash})
   .exec()
   .then((accountResult) => {
-    for (let account of accountResult) {
-      console.log(`${uName} $$ ${account.username}`)
-      let enteredPlain = CryptoJS.AES.decrypt(uName, cryptkey).toString(CryptoJS.enc.Utf8);
-      let storedPlain = CryptoJS.AES.decrypt(account.username, cryptkey).toString(CryptoJS.enc.Utf8);
-
-      console.log(`${enteredPlain} || ${storedPlain}`)
-      if (enteredPlain == storedPlain) {
-        console.log('yay');
-        return (account);
-      }
-    }
-    return("0");
+    return (accountResult);
   })
   .catch((err) => {
+    console.log('a');
     return ("Error: " + err);
   })
 }
@@ -339,10 +395,14 @@ function findAccountWithID(id) {
 }
 
 function checkAccount(uName) {
-  return Account.findOne({ username: uName })
+  return Account.findOne({ usernameHash: uName })
   .exec()
   .then((accountResult) => {
-    return (accountResult);
+    if (accountResult._id != null) {
+      return true;
+    } else {
+      return false;
+    }
   })
   .catch((err) => {
     return ("Error: " + err);
@@ -437,7 +497,7 @@ function findProjectUsers() {
       for (let account of accountResult) {
         rtrn.push({
           _id: account._id,
-          username: account.username
+          username: account.username,
         })
       }
       return rtrn;
@@ -471,10 +531,10 @@ function qObj (id) {
 }
 
 function checkPerm (id) {
+  console.log({"_id": project, "admin": id});
   return Project.findOne({"_id": project, "admin": id})
   .exec()
   .then((projectResult) => {
-    console.log(`Project: ${projectResult}`);
     if (projectResult._id != null) {
       return 1;
     }
@@ -483,4 +543,8 @@ function checkPerm (id) {
   .catch((err) => {
     return 0;
   })
+}
+
+function randCode () {
+  return (Math.round(Math.random()*1000)-1).toString().padStart(3, '0')
 }

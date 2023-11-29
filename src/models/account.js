@@ -5,8 +5,9 @@ const accountSchema = new mongoose.Schema({
     _id: mongoose.Schema.Types.ObjectId,
     username: String,
     password: String,
+    usernameHash: String,
     profile_picture: String,
-    user_email: String,
+    email: String,
 }, {
     versionKey: false,
     strict: true,
