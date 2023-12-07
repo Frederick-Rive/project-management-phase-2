@@ -56,7 +56,8 @@ const TaskBackup = backup.model('Task', require('./models/task.js'), 'Task');
 var userPlaceholder = new Account();
 var user = new Account();
 var perm = 0;
-var twofaCode = "0";
+var twofaCode = "";
+var twofaChecks = 0;
 // replace with an actual project system, if you have the time
 var project = "655a0ace246914f44324c6e4";
 
@@ -64,25 +65,33 @@ var project = "655a0ace246914f44324c6e4";
 app.get('/account', async (req, res) => {
   if (req.query.u && req.query.u != "{}") {
     var account = await findAccount(req.query.u, req.query.h);
+    console.log(account);
     if (account != null) {
       account.password = null;
       perm = await checkPerm(account._id);
-      console.log(`Perm: ${perm}`)
+      console.log(`Perm: ${perm}`);
 
-      if (perm) {
+      console.log(account.resetrequired)
+
+      if (account.resetrequired) {
+        userPlaceholder = account;
+        res.send("2");
+      } else if (perm) {
         userPlaceholder = account;
         
         let timestamp = new Date();
 
         twofaCode = `${randCode()} ${randCode()} ${randCode()}`
 
+        let userEmail = CryptoJS.AES.decrypt(account.email, cryptkey).toString(CryptoJS.enc.Utf8);
+
         var mailOptions = {
           from: emailAddress,
-          to: account.email,
+          to: userEmail,
           subject: 'Verification Code',
           html: `Hi ${CryptoJS.AES.decrypt(userPlaceholder.username, cryptkey).toString(CryptoJS.enc.Utf8)},
 
-          We have received a login attempt at ${timestamp.getHours()}:${timestamp.getMinutes()}
+          We have received a login attempt at ${timestamp.getHours().toString().padStart(2, '0')}:${timestamp.getMinutes().toString().padStart(2, '0')}.
           
           If this was you, please enter the code <h1> ${twofaCode} </h1> into the application to confirm your login.
           
@@ -133,11 +142,21 @@ app.get('/logout', async (req, res) => {
 
 app.get('/twofa', async (req, res) => {
   if (req.query.c.replace(/\s/g, '') == twofaCode.replace(/\s/g, '')) {
+    twofaChecks = 0;
     user = userPlaceholder;
     perm = 1;
     res.send(user);
   } else {
-    res.send("0")
+    twofaChecks++;
+    console.log(twofaChecks);
+    if (twofaChecks == 5) {
+      userPlaceholder == {};
+      twofaCode == "";
+      twofaChecks = 0;
+      res.send("1")
+    } else {
+      res.send("0")
+    }
   }
 });
   
@@ -192,8 +211,9 @@ app.patch('/task', async (req, res) => {
 })
 
 app.post('/account', async (req, res) => {
-  console.log()
+  console.log(req.body)
   var accTest = await checkAccount(req.body.c);
+  console.log(accTest)
   if (accTest) {
     console.log("Name Taken");
     res.send('0');
@@ -203,14 +223,17 @@ app.post('/account', async (req, res) => {
         username: req.body.n,
         password: req.body.h,
         email: req.body.e,
-        usernameHash: req.body.c
+        usernameHash: req.body.c,
+        resetrequired: false,
       });
 
       //logging action
       postLog(null, 'Register');
 
       newAccount.save();
-      res.send('1');
+
+      user = newAccount
+      res.send(user);
     }
 });
 
@@ -237,9 +260,33 @@ app.get('/useraccount', async (req, res) => {
   }
 });
 
+app.get('/taskaccess', async (req, res) => {
+  if (req.query.action == "grant") {
+    res.send(grantAccessToTask(req.query.task, req.query.user));
+  } else if (req.query.action == "revoke") {
+    res.send(revokeAccessToTask(req.query.task, req.query.user));
+  }
+}); 
+
 //gets an account based on its ID
 app.get('/user', async (req, res) => {
   res.send(user);
+});
+
+app.get('/resetpassword', async (req, res) => {
+  console.log(req.query);
+  let rtrn = await Account.findOneAndUpdate({"_id": userPlaceholder._id}, { resetrequired: false, password: req.query.p });
+  res.send(rtrn);
+});
+
+app.get('/forcereset', async (req, res) => {
+  let rtrn = await Account.findOneAndUpdate({"_id": req.query.user}, { passwordreset: true });
+  res.send(rtrn);
+});
+
+app.get('/deleteuser', async (req, res) => {
+  let rtrn = await Account.deleteOne({"_id": req.query.user});
+  res.send(rtrn);
 });
 
 app.get('/uP', async (req, res) => {
@@ -253,23 +300,31 @@ app.get('/uP', async (req, res) => {
 });
 
 app.get('/projectlogs',  async (req, res) => {
-  var logs = await findProjectLogs();
-  if (logs) {
-    res.send(logs);
+  if (perm) {
+    var logs = await findProjectLogs();
+    if (logs) {
+      res.send(logs);
+    } else {
+      res.send("0");
+    }
   } else {
     res.send("0");
   }
 });
 
 app.get('/projectusers', async (req, res) => {
-  var users = await findProjectUsers();
-  if (users) {
-    for (let i = 0; i < users.length; i++) {
-      let userPerm = await checkPerm (users[i]._id)
-      users[i].perm = userPerm;
-    }
-    console.log(users);
-    res.send(users);
+  if (perm) {
+    var users = await findProjectUsers();
+    if (users) {
+      for (let i = 0; i < users.length; i++) {
+        let userPerm = await checkPerm (users[i]._id)
+        users[i].perm = userPerm;
+      }
+      console.log(users);
+      res.send(users);
+    } else {
+      res.send("0");
+    } 
   } else {
     res.send("0");
   }
@@ -398,7 +453,8 @@ function checkAccount(uName) {
   return Account.findOne({ usernameHash: uName })
   .exec()
   .then((accountResult) => {
-    if (accountResult._id != null) {
+    console.log(accountResult)
+    if (accountResult != null) {
       return true;
     } else {
       return false;
@@ -441,6 +497,28 @@ function findTask(id) {
 
 function findUserTasks() {
   return Task.find(qObj(0))
+  .exec()
+  .then((taskResult) => {
+    return taskResult;
+  })
+  .catch((err) => {
+    return ("Error: " + err);
+  })
+}
+
+function grantAccessToTask(taskId, userId) {
+  return Task.findOneAndUpdate({"_id": taskId}, { $push : {users: userId}})
+  .exec()
+  .then((taskResult) => {
+    return taskResult;
+  })
+  .catch((err) => {
+    return ("Error: " + err);
+  })
+}
+
+function revokeAccessToTask(taskId, userId) {
+  return Task.findOneAndUpdate({"_id": taskId}, { $pull : {users: userId}})
   .exec()
   .then((taskResult) => {
     return taskResult;

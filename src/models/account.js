@@ -8,6 +8,7 @@ const accountSchema = new mongoose.Schema({
     usernameHash: String,
     profile_picture: String,
     email: String,
+    resetrequired: Boolean,
 }, {
     versionKey: false,
     strict: true,

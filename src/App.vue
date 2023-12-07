@@ -55,6 +55,24 @@
       
       </form>
 
+      <form id="password-reset">
+
+        <p> Your account has been flagged as vulernable. Please reset your password </p>
+        
+        <br><br>
+
+        <label for="password-reset-password">Enter old password</label>
+        <input id="password-reset-password" v-model="password" />
+        <br><br>
+        <label for="password-reset-input">Enter new password</label>
+        <input id="password-reset-input" v-model="twofa" />
+
+        <br><p style="text-align: center;">{{ response }}</p><br>
+        
+        <input id="password-reset-confirm" type="submit" value="Confirm" style="width: 40%; background-color: #79EBC6; border: none; font-size: 18px; cursor: pointer;  margin-left: 30%;" @click.prevent="resetPassword()">
+
+      </form>
+
     </div>
 
     <div id="heading">
@@ -77,10 +95,11 @@
           <br><br>
           <hr>
           <br>
-
-          <li v-for="user in activeTask.userNames" style="height: 135px;">
-            <div class="modal-link"> {{user}} </div>
-          </li>
+          <div style="height: 135px;">
+            <li v-for="user in activeTask.userNames">
+              <div class="modal-link"> {{user}} </div>
+            </li>
+          </div>
           
           <input id="submit" type="submit" style="position: relative; left: 90%; background-color: #79EBC6; border: none; padding: 5px; border-radius: 5px; font-size: 18px; cursor: pointer;">
         </form>
@@ -97,10 +116,10 @@
 
             <li v-for="log in activeUser.logs" id="modal-user-logs">
               <div class="log-action">{{log.action}}</div>
-              <button class="log-button" @click.prevent="openTaskModal(task)"> {{log.taskName}} </button> 
+              <button v-if="log.taskName != null" class="log-button" @click.prevent="openTaskModal(task)"> {{log.taskName}} </button>
               <div class="log-timestamp">{{`${log.createdAt.split('T')[0]} ${log.createdAt.split('T')[1].split('.')[0]}pm`}}</div>
             </li>
-
+      
           </div>
         </div>
 
@@ -111,13 +130,16 @@
           </h2>
           <hr style="border: 1px solid #000">
 
-          <li v-for="task in activeUser.tasks">
-            <div class="modal-task-widget" @click.self="openTaskModal(task)">
-              <p>{{task.name}}</p>
-              <div class="task-remove" @click.prevent="removeTaskAccess(task)">Remove</div>
-            </div>
-          </li>
-          
+          <div style="height: 270px; overflow: hidden scroll; white-space: nowrap;">
+            <li v-for="task in activeUser.tasks">
+              <div class="modal-task-widget" @click.self="openTaskModal(task)">
+                <p>{{task.name}}</p>
+                <div class="task-remove" @click.prevent="removeTaskAccess(task)">Remove</div>
+              </div>
+            </li>
+          </div>
+          <button class="modal-user-button" @click.prevent="forcePasswordReset">Reset Password</button>
+          <button class="modal-user-button" @click.prevent="removeUser">Remove User</button>
         </div>
       </div>
 
@@ -132,10 +154,7 @@
 
     <div id="grid-container">
       <div id="left-bar">
-
-        {{ taskColours }}
-
-        <img src="src/img/pfp.jpeg" class="pfp" alt="Profile Picture">
+        <img src="/src/img/pfp.jpeg" class="pfp" alt="Profile Picture">
         <h2 v-if="account !== null">{{ account.name }}</h2>
 
         <h1>Project Name</h1>
@@ -144,7 +163,7 @@
           <h3>Starting Soon</h3> <h4>{{ startingSoon.length }}</h4>
           <hr>
           <li v-for="task of startingSoon">
-            <div class="notification" @onclick="openTaskModal(task)" style='background-color: v-bind("taskColours[task]")'>{{ tasks[task].name }}</div>
+            <div class="notification" @click="openTaskModal(task)">{{ tasks[task].name }}</div>
           </li>
         </div>
 
@@ -152,7 +171,7 @@
           <h3>Due Soon</h3> <h4>{{ dueSoon.length }}</h4>
           <hr>
           <li v-for="task of dueSoon">
-            <div class="notification" @onclick="openTaskModal(task)" style='background-color: v-bind("taskColours[task]")'>{{ tasks[task].name }}</div>
+            <div class="notification" @click="openTaskModal(task)">{{ tasks[task].name }}</div>
           </li>
         </div>
 
@@ -160,8 +179,7 @@
           <h3>Overdue</h3> <h4>{{ overdue.length }}</h4>
           <hr>
           <li v-for="task of overdue">
-            {{ taskColours[1] }}
-            <div class="notification" @onclick="openTaskModal(task)" style='background-color: v-bind("taskColours[1]");'>{{ tasks[task].name }}</div>
+            <div class="notification" @click="openTaskModal(task)" style="background-color: #EB8FAA;">{{ tasks[task].name }}</div>
           </li>
         </div>
 
@@ -175,7 +193,8 @@
 
           <div style="max-height: 700px; overflow-y: scroll;  overflow-x: hidden; white-space: nowrap;">
             <li v-for="item in todo">
-              <div class="kanban-widget" :ref='"task"+item' :id='"task"+item' @mousedown="dragMouseDown($event, `task${item}`)">{{tasks[item].name}}</div>
+              <div v-if="this.overdue.includes(item)" class="kanban-widget-overdue" :ref='"task"+item' :id='"task"+item' @mousedown="dragMouseDown($event, `task${item}`)">{{tasks[item].name}}</div>
+              <div v-else class="kanban-widget" :ref='"task"+item' :id='"task"+item' @mousedown="dragMouseDown($event, `task${item}`)">{{tasks[item].name}}</div>
             </li>
           </div>
 
@@ -188,8 +207,8 @@
 
           <div style="max-height: 700px; overflow-y: scroll;  overflow-x: hidden; white-space: nowrap;">
             <li v-for="item in inprogress">
-              <div class="kanban-widget" :ref='"task"+item' :id='"task"+item' @mousedown="dragMouseDown($event, `task${item}`)">{{tasks[item].name}}</div>
-            </li>
+              <div v-if="this.overdue.includes(item)" class="kanban-widget-overdue" :ref='"task"+item' :id='"task"+item' @mousedown="dragMouseDown($event, `task${item}`)">{{tasks[item].name}}</div>
+              <div v-else class="kanban-widget" :ref='"task"+item' :id='"task"+item' @mousedown="dragMouseDown($event, `task${item}`)">{{tasks[item].name}}</div>            </li>
           </div>
         </div>
 
@@ -198,10 +217,102 @@
 
           <div style="max-height: 700px; overflow-y: scroll;  overflow-x: hidden; white-space: nowrap;">
             <li v-for="item in completed">
-              <div class="kanban-widget" :ref='"task"+item' :id='"task"+item' @mousedown="dragMouseDown($event, `task${item}`)">{{tasks[item].name}}</div>
-            </li>
+              <div v-if="this.overdue.includes(item)" class="kanban-widget-overdue" :ref='"task"+item' :id='"task"+item' @mousedown="dragMouseDown($event, `task${item}`)">{{tasks[item].name}}</div>
+              <div v-else class="kanban-widget" :ref='"task"+item' :id='"task"+item' @mousedown="dragMouseDown($event, `task${item}`)">{{tasks[item].name}}</div>            </li>
           </div>
         </div>
+
+      </div>
+
+      <div id="gantt-chart">
+
+        <div id="gantt-heading"> 
+          <div class="gantt-heading-column" @click="changeGanttDate(ganttDates[0])"> {{ ganttDates[0].toDateString() }} </div>
+          <div class="gantt-heading-column" @click="changeGanttDate(ganttDates[1])"> {{ ganttDates[1].toDateString() }} </div>
+          <div class="gantt-heading-column" @click="changeGanttDate(ganttDates[2])"> {{ ganttDates[2].toDateString() }} </div>
+          <div class="gantt-heading-column" @click="changeGanttDate(ganttDates[3])"> {{ ganttDates[3].toDateString() }} </div>
+          <div class="gantt-heading-column" @click="changeGanttDate(ganttDates[4])"> {{ ganttDates[4].toDateString() }} </div>
+          <div class="gantt-heading-column" @click="changeGanttDate(ganttDates[5])"> {{ ganttDates[5].toDateString() }} </div>
+          <div class="gantt-heading-column" @click="changeGanttDate(ganttDates[6])"> {{ ganttDates[6].toDateString() }} </div>
+          <div class="gantt-heading-column" @click="changeGanttDate(ganttDates[7])"> {{ ganttDates[7].toDateString() }} </div>
+          <div class="gantt-heading-column" @click="changeGanttDate(ganttDates[8])"> {{ ganttDates[8].toDateString() }} </div>
+          <div class="gantt-heading-column" @click="changeGanttDate(ganttDates[9])"> {{ ganttDates[9].toDateString() }} </div>
+        </div>
+
+        <li v-for="task of tasks">
+          <div class="gantt-row">
+            <div @click="openTaskModal(task)" v-if="new Date(task.startDate) < ganttDates[0] && new Date(task.endDate) > ganttDates[0]" class="gantt-bar">{{ task.name }}</div>
+            <div @click="openTaskModal(task)" v-else-if="new Date(task.startDate).getTime() == ganttDates[0].getTime()" class="gantt-bar-start"> </div>
+            <div @click="openTaskModal(task)" v-else-if="new Date(task.endDate).getTime() == ganttDates[0].getTime()" class="gantt-bar-end"> </div>
+            <div v-else class="gantt-bar-blank"></div>
+          </div>
+
+          <div class="gantt-row">
+            <div @click="openTaskModal(task)" v-if="new Date(task.startDate) < ganttDates[1] && new Date(task.endDate) > ganttDates[1]" class="gantt-bar"></div>
+            <div @click="openTaskModal(task)" v-else-if="new Date(task.startDate).getTime() == ganttDates[1].getTime()" class="gantt-bar-start">{{ task.name }}</div>
+            <div @click="openTaskModal(task)" v-else-if="new Date(task.endDate).getTime() == ganttDates[1].getTime()" class="gantt-bar-end"></div>
+            <div v-else class="gantt-bar-blank"></div>
+          </div>
+
+
+          <div class="gantt-row">
+            <div @click="openTaskModal(task)" v-if="new Date(task.startDate) < ganttDates[2] && new Date(task.endDate) > ganttDates[2]" class="gantt-bar"></div>
+            <div @click="openTaskModal(task)" v-else-if="new Date(task.startDate).getTime() == ganttDates[2].getTime()" class="gantt-bar-start">{{ task.name }}</div>
+            <div @click="openTaskModal(task)" v-else-if="new Date(task.endDate).getTime() == ganttDates[2].getTime()" class="gantt-bar-end"></div>
+            <div v-else class="gantt-bar-blank"></div>
+          </div>
+
+
+          <div class="gantt-row">
+            <div @click="openTaskModal(task)" v-if="new Date(task.startDate) < ganttDates[3] && new Date(task.endDate) > ganttDates[3]" class="gantt-bar"></div>
+            <div @click="openTaskModal(task)" v-else-if="new Date(task.startDate).getTime() == ganttDates[3].getTime()" class="gantt-bar-start">{{ task.name }}</div>
+            <div @click="openTaskModal(task)" v-else-if="new Date(task.endDate).getTime() == ganttDates[3].getTime()" class="gantt-bar-end"></div>
+            <div v-else class="gantt-bar-blank"></div>
+          </div>
+
+
+          <div class="gantt-row">
+            <div @click="openTaskModal(task)" v-if="new Date(task.startDate) < ganttDates[4] && new Date(task.endDate) > ganttDates[4]" class="gantt-bar"></div>
+            <div @click="openTaskModal(task)" v-else-if="new Date(task.startDate).getTime() == ganttDates[4].getTime()" class="gantt-bar-start">{{ task.name }}</div>
+            <div @click="openTaskModal(task)" v-else-if="new Date(task.endDate).getTime() == ganttDates[4].getTime()" class="gantt-bar-end"></div>
+            <div v-else class="gantt-bar-blank"></div>
+          </div>
+
+          <div class="gantt-row">
+            <div @click="openTaskModal(task)" v-if="new Date(task.startDate) < ganttDates[5] && new Date(task.endDate) > ganttDates[5]" class="gantt-bar"></div>
+            <div @click="openTaskModal(task)" v-else-if="new Date(task.startDate).getTime() == ganttDates[5].getTime()" class="gantt-bar-start">{{ task.name }}</div>
+            <div @click="openTaskModal(task)" v-else-if="new Date(task.endDate).getTime() == ganttDates[5].getTime()" class="gantt-bar-end"></div>
+            <div v-else class="gantt-bar-blank"></div>
+          </div>
+
+          <div class="gantt-row">
+            <div @click="openTaskModal(task)" v-if="new Date(task.startDate) < ganttDates[6] && new Date(task.endDate) > ganttDates[6]" class="gantt-bar"></div>
+            <div @click="openTaskModal(task)" v-else-if="new Date(task.startDate).getTime() == ganttDates[6].getTime()" class="gantt-bar-start">{{ task.name }}</div>
+            <div @click="openTaskModal(task)" v-else-if="new Date(task.endDate).getTime() == ganttDates[6].getTime()" class="gantt-bar-end"></div>
+            <div v-else class="gantt-bar-blank"></div>
+          </div>
+
+          <div class="gantt-row">
+            <div @click="openTaskModal(task)" v-if="new Date(task.startDate) < ganttDates[7] && new Date(task.endDate) > ganttDates[7]" class="gantt-bar"></div>
+            <div @click="openTaskModal(task)" v-else-if="new Date(task.startDate).getTime() == ganttDates[7].getTime()" class="gantt-bar-start">{{ task.name }}</div>
+            <div @click="openTaskModal(task)" v-else-if="new Date(task.endDate).getTime() == ganttDates[7].getTime()" class="gantt-bar-end"></div>
+            <div v-else class="gantt-bar-blank"></div>
+          </div>
+       
+          <div class="gantt-row">
+            <div @click="openTaskModal(task)" v-if="new Date(task.startDate) < ganttDates[8] && new Date(task.endDate) > ganttDates[8]" class="gantt-bar"></div>
+            <div @click="openTaskModal(task)" v-else-if="new Date(task.startDate).getTime() == ganttDates[8].getTime()" class="gantt-bar-start">{{ task.name }}</div>
+            <div @click="openTaskModal(task)" v-else-if="new Date(task.endDate).getTime() == ganttDates[8].getTime()" class="gantt-bar-end"></div>
+            <div v-else class="gantt-bar-blank"></div>
+          </div>
+
+          <div class="gantt-row">
+            <div @click="openTaskModal(task)" v-if="new Date(task.startDate) < ganttDates[9] && new Date(task.endDate) > ganttDates[9]" class="gantt-bar"></div>
+            <div @click="openTaskModal(task)" v-else-if="new Date(task.startDate).getTime() == ganttDates[9].getTime()" class="gantt-bar-start">{{ task.name }}</div>
+            <div @click="openTaskModal(task)" v-else-if="new Date(task.endDate).getTime() == ganttDates[9].getTime()" class="gantt-bar-end"></div>
+            <div v-else class="gantt-bar-blank"></div>
+          </div>
+        </li>
 
       </div>
 
@@ -220,9 +331,10 @@
           
           <div id="log-display">
             <li v-for="log in logs">
-              <button class="log-button"> {{log.userName}} </button> 
-              <div class="log-action">{{log.action}}</div>
-              <button class="log-button"> {{log.taskName}} </button> 
+              <button class="log-button" @click.prevent="openLogWidget(log, 'user')"> {{log.userName}} </button> 
+              <div class="log-action" v-if="log.taskName != null">{{log.action}}</div>
+              <div class="log-action" v-else style="width: 36%; margin: 0 5px; padding: 0; text-align: left;">{{log.action}}</div>
+              <button class="log-button" v-if="log.taskName != null" @click.prevent="openLogWidget(log, 'task')"> {{log.taskName}} </button> 
               <div class="log-timestamp">{{`${log.createdAt.split('T')[0]} ${log.createdAt.split('T')[1].split('.')[0]}pm`}}</div>
             </li>
           </div>
@@ -236,20 +348,20 @@
           <hr style="border: 1px solid #000">
 
           <li v-for="account in admins">
-            <div class="account-widget" @click="openUserModal(account)">
-              <div class="pfp"></div>
-              <p>{{account.username}}</p>
-              <div class="account-remove">Remove</div>
+            <div class="account-widget" @click.self="openUserModal(account)">
+              <img src="/src/img/pfp.jpeg" class="pfp" alt="Profile Picture" @click.self="openUserModal(account)">
+              <p @click.self="openUserModal(account)">{{account.username}}</p>
+              <div class="account-remove" @click.self="removeUser()">Remove</div>
             </div>
           </li>
 
           <h2 style="margin-top: 60px">Members</h2>
           <hr style="border: 1px solid #000">
           <li v-for="account in accounts">
-            <div class="account-widget" @click="openUserModal(account)">
-              <div class="pfp"></div>
-              <p>{{account.username}}</p>
-              <div class="account-remove">Remove</div>
+            <div class="account-widget" @click.self="openUserModal(account)">
+              <img src="/src/img/pfp.jpeg" class="pfp" alt="Profile Picture" @click.self="openUserModal(account)">
+              <p @click.self="openUserModal(account)">{{account.username}}</p>
+              <div class="account-remove" @click.self="removeUser">Remove</div>
             </div>
           </li>
         </div>
@@ -263,7 +375,7 @@
   import { ref, onMounted, createApp } from 'vue'
   import CryptoJS from 'crypto-js'
     
-  const lifetime = 50000;
+  const lifetime = 500000;
 
   export default {
     name: "Project Management",
@@ -287,12 +399,13 @@
         admins: [],
         activeTask: {},
         activeUser: {},
-        taskColours: [],
         account: null,
         uP: 0,
+        ganttDates: [new Date('2023-11-25'),new Date('2023-11-26'),new Date('2023-11-27'),new Date('2023-11-28'),new Date('2023-11-29'),new Date('2023-11-30'),new Date('2023-12-01'),new Date('2023-12-02'),new Date('2023-12-03'),new Date('2023-12-04')],
         showLogin: "none",
         showRegister: "none",
         showTwoFA: "none",
+        showPasswordReset: "none",
         showLoginBack: "none",
         showHeading: "none",
         showKanban: "none",
@@ -318,12 +431,10 @@
     },
 
     mounted() {
-      let plainText = "aaa"
+      let plainText = "freddierive@gmail.com"
       let ciphertext = CryptoJS.AES.encrypt(plainText, this.cryptkey).toString();
 
       plainText = CryptoJS.AES.decrypt(ciphertext, this.cryptkey).toString(CryptoJS.enc.Utf8);
-
-      console.log(CryptoJS.SHA3("test2").toString())
 
       if (localStorage.getItem('lifeStart')) {
 
@@ -333,6 +444,8 @@
           localStorage.removeItem('lifeStart');
           this.username = 'test';
           this.password = 'test';
+
+          this.response = "Session timed out, please log in again."
 
           this.logout();
         } else {
@@ -344,25 +457,20 @@
     },
     methods:  {
       reloadData () {
-        this.logs = [];
-        this.tasks = [];
-        this.todo = [];
-        this.inprogress = [];
-        this.completed = [];
-        this.startingSoon = [];
-        this.dueSoon = [];
-        this.overdue = [];
-        this.accounts = [];
         this.getUserTasks();
         this.getProjectLogs();
         this.getProjectUsers();
       },
 
       async getUserTasks() {
+        // let tasks = JSON.parse(localStorage.getItem("tasks"))
         this.tasks = [];
         this.todo = [];
         this.inprogress = []
         this.completed = [];
+        this.startingSoon = [];
+        this.dueSoon = [];
+        this.overdue = [];
         let response = await fetch(`http://localhost:6069/usertasks`);
         let taskArr = await response.json();
         for (let task of taskArr) {
@@ -374,7 +482,6 @@
         let response = await fetch(`http://localhost:6069/task?id=${id}`);
 
         let cryptTask = await response.json();
-        console.log(cryptTask);
         let decryptTask = {};
 
         decryptTask._id = cryptTask._id
@@ -384,8 +491,6 @@
         decryptTask.endDate = cryptTask.endDate
         decryptTask.state = CryptoJS.AES.decrypt(cryptTask.state, this.cryptkey).toString(CryptoJS.enc.Utf8);
         decryptTask.users = cryptTask.users;
-
-        console.log(decryptTask);
 
         this.tasks.push(decryptTask);
 
@@ -423,13 +528,10 @@
 
         if (this.tasks[taskIndex].state != "Completed" && dueDiffDays < 0) {
           this.overdue.push(taskIndex);
-          this.taskColours[taskIndex] = "#EB8FAA";
         } else if(this.tasks[taskIndex].state == "To Do" && startDiffDays <= 3) {
           this.startingSoon.push(taskIndex);
-          this.taskColours[taskIndex] = "#79EBC6";
         } else if (this.tasks[taskIndex].state != "Completed" && dueDiffDays <= 3 && dueDiffDays >= 0) {
           this.dueSoon.push(taskIndex);
-          this.taskColours[taskIndex] = "#79EBC6";
         }
       },
 
@@ -440,7 +542,6 @@
 
         let response = await fetch(`http://localhost:6069/account?u=${uHash}&h=${pHash}`);
         let data = await response.json();
-        console.log(data);
 
         if (data == "0") {
           this.username = "";
@@ -448,6 +549,10 @@
           this.response = "This username and password combination is incorrect"
         } else if (data == "1") {
           this.openTwoFA();
+        }else if (data == "2") {
+          this.username = "";
+          this.password = "";       
+          this.openPasswordReset();
         } else if (data._id != null) {
           this.account = data;
           this.account.name = this.username;
@@ -459,7 +564,6 @@
 
           response = await fetch(`http://localhost:6069/uP`);
           this.uP = await response.json();
-          console.log(this.uP);
 
           if (this.uP) {
             this.getProjectLogs();
@@ -473,11 +577,17 @@
       async checkTwoFA() {
         let response = await fetch(`http://localhost:6069/twofa?c=${this.twofa}`);
         let data = await response.json();
-        console.log(data);
 
+        this.twofa = "";
+
+        console.log(data);
         if (data == "0") {
-          this.twofa = "";
           this.response = "Code Incorrect";
+        } else if (data == "1") {
+          this.username = "";
+          this.password = "";
+          this.openLogin();
+          this.response = "Too many failed code entries. Please verify your account again.";
         } else {
           this.account = data;
           
@@ -490,7 +600,6 @@
 
           response = await fetch(`http://localhost:6069/uP`);
           this.uP = await response.json();
-          console.log(this.uP);
 
           if (this.uP) {
             this.getProjectLogs();
@@ -502,6 +611,9 @@
       async logout() {
         let response = await fetch(`http://localhost:6069/logout`);
         this.account = await response.json();
+        this.username = "";
+        this.password = "";
+        this.response = "";
         this.reloadData();
         this.openLogin();
       },
@@ -510,7 +622,6 @@
         let uCrypt = "";
         // sometimes the encryption creates a cipher that it cannot decode
         while (true) {
-          console.log('a');
           uCrypt = CryptoJS.AES.encrypt(this.username, this.cryptkey).toString();
           if (!uCrypt.includes("+")) {
             break;
@@ -519,7 +630,6 @@
 
         let eCrypt = "";
         while (true) {
-          console.log('a');
           eCrypt = CryptoJS.AES.encrypt(this.email, this.cryptkey).toString();
           if (!eCrypt.includes("+")) {
             break;
@@ -560,9 +670,14 @@
         this.showLogin = "block";
         this.showRegister = "none";
         this.showTwoFA = "none";
+        this.showPasswordReset = "none";
         this.showLoginBack = "block";
         this.showGantt = "none";
         this.showAdmin = "none";
+
+        this.response = "";
+        this.username = "";
+        this.password = "";
       },
 
       openRegister() {
@@ -571,9 +686,12 @@
         this.showLogin = "none";
         this.showRegister = "block";
         this.showTwoFA = "none";
+        this.showPasswordReset = "none";
         this.showLoginBack = "block";
         this.showGantt = "none";
         this.showAdmin = "none";
+
+        this.response = "";
       },
 
       openTwoFA() {
@@ -582,6 +700,22 @@
         this.showLogin = "none";
         this.showRegister = "none";
         this.showTwoFA = "block";
+        this.showPasswordReset = "none";
+        this.showLoginBack = "block";
+        this.showGantt = "none";
+        this.showAdmin = "none";
+
+        this.response = "";
+        this.twofa = "";
+      },
+
+      openPasswordReset() {
+        this.showHeading = "none";
+        this.showKanban = "none";
+        this.showLogin = "none";
+        this.showRegister = "none";
+        this.showTwoFA = "none";
+        this.showPasswordReset = "block";
         this.showLoginBack = "block";
         this.showGantt = "none";
         this.showAdmin = "none";
@@ -595,9 +729,12 @@
         this.showLogin = "none";
         this.showRegister = "none";
         this.showTwoFA = "none";
+        this.showPasswordReset = "none";
         this.showLoginBack = "none";
         this.showGantt = "none";
         this.showAdmin = "none";
+        
+        this.response = "";
       },
       
       openGanttChart() {
@@ -606,9 +743,12 @@
         this.showLogin = "none";
         this.showRegister = "none";
         this.showTwoFA = "none";
+        this.showPasswordReset = "none";
         this.showLoginBack = "none";
-        this.showGantt = "none";
+        this.showGantt = "block";
         this.showAdmin = "none";
+        
+        this.response = "";
       },
 
       openAdminScreen() {
@@ -617,9 +757,12 @@
         this.showLogin = "none";
         this.showRegister = "none";
         this.showTwoFA = "none";
+        this.showPasswordReset = "none";
         this.showLoginBack = "none";
         this.showGantt = "none";
         this.showAdmin = "grid"
+        
+        this.response = "";
       },
 
       async checkForAccount() {
@@ -656,7 +799,6 @@
         encryptedTask.startDate = this.activeTask.startDate;
         encryptedTask.endDate = this.activeTask.endDate;
         encryptedTask.state = CryptoJS.AES.encrypt(this.activeTask.state, this.cryptkey).toString();
-        console.log(encryptedTask);
 
         let requestOptions = {};
         if (this.activeTask._id != null && this.activeTask._id != undefined) {
@@ -684,34 +826,41 @@
 
       async backup(action) {
         let response = await fetch(`http://localhost:6069/backup?order=${action}`);
-        console.log(action);
+
+        if(action == "Load") {
+          this.reloadData();
+          this.openKanbanBoard();
+        }
       },
 
       async getProjectLogs() {
+        this.logs = [];
+        
         let response = await fetch(`http://localhost:6069/projectlogs`);
+        console.log('a');
         let l = await response.json();
-
         console.log(l);
+        console.log('b')
 
         let logDict = {};
         for (let task of this.tasks) {
-          logDict.task._id = task.name;
+          logDict[task._id] = task.name;
         }
         
         for (let log of l) {
           if (log.task == null) {
-            //this.logs.push(log);
-            continue;
+            this.logs.push(log);
           } else {
             if (logDict[log.task]) {
               log.taskName = logDict[log.task];
             } else {
+              console.log(log.task)
               let response = await fetch(`http://localhost:6069/task?id=${log.task}`);
-              console.log(response);
               let task = await response.json();
+              console.log('c');
               if (task) {
-                log.taskName = task.name;
-                logDict[log.task] = task.name;
+                log.taskName = CryptoJS.AES.decrypt(task.name, this.cryptkey).toString(CryptoJS.enc.Utf8);
+                logDict[log.task] = CryptoJS.AES.decrypt(task.name, this.cryptkey).toString(CryptoJS.enc.Utf8);
               } else {
                 continue;
               }
@@ -720,29 +869,30 @@
 
           if (logDict[log.user]) {
             log.userName = logDict[log.user];
-          } else {
+          } else if (log.user) {
+            console.log(log.user)
             let response = await fetch(`http://localhost:6069/account?id=${log.user}`);
-            console.log('o');
             let acc = await response.json();
             log.userName = CryptoJS.AES.decrypt(acc.username, this.cryptkey).toString(CryptoJS.enc.Utf8);
+            logDict[log.user] = CryptoJS.AES.decrypt(acc.username, this.cryptkey).toString(CryptoJS.enc.Utf8);
+          } else {
+            return;
           }
 
           this.logs.push(log);
-          console.log('i');
         }
 
-        console.log(this.logs)
       },
 
       async getProjectUsers() {
+        this.accounts = [];
+        this.admins = [];
+
         let response = await fetch(`http://localhost:6069/projectusers`);
         let cryptAccounts = await response.json();
 
         for (let i = 0; i < cryptAccounts.length; i++) {
-          console.log(cryptAccounts[i]);
           cryptAccounts[i].username = CryptoJS.AES.decrypt(cryptAccounts[i].username, this.cryptkey).toString(CryptoJS.enc.Utf8);
-          console.log(cryptAccounts[i]);
-          console.log(cryptAccounts[i].perm);
           switch(cryptAccounts[i].perm) {
             case 0:
               this.accounts.push(cryptAccounts[i]);
@@ -753,7 +903,31 @@
         }
       },
 
+      openLogWidget(log, widget) {
+        if(widget == "task") {
+          for (let i = 0; i < this.tasks.length; i++) {
+            console.log()
+            if (this.tasks[i]._id == log.task) {
+              console.log('as');
+              return this.openTaskModal(i);
+            }
+          }
+        } else if (widget == "user")  {
+          for (let i = 0; i < this.accounts.length; i++) {
+            if (this.accounts[i]._id == log.user) {
+              return this.openUserModal(this.accounts[i]);
+            }
+          }
+          for (let i = 0; i < this.admins.length; i++) {
+            if (this.admins[i]._id == log.user) {
+              return this.openUserModal(this.admins[i]);
+            }
+          }
+        }
+      },
+
       openTaskModal(task) {
+        console.log(task);
         if (typeof task == "object") {
           this.activeTask = task;
           this.activeTask.userNames = [];
@@ -783,7 +957,6 @@
         this.activeUser.logs = [];
         this.activeUser.tasks = [];
 
-        console.log(account);
 
         for (let log of this.logs) {
           if (log.user == this.activeUser._id) {
@@ -791,16 +964,11 @@
           }
         }
 
-        console.log(account);
-
         for (let task of this.tasks) {
-          console.log(task);
           if (task.users.includes(this.activeUser._id)) {
             this.activeUser.tasks.push(task);
           }
         }
-
-        console.log(account);
 
         this.showModalBack = "block";
         this.showModalUser = "grid";
@@ -810,26 +978,28 @@
         this.showModalTaskList = (this.showModalTaskList == "none") ? "block" : "none";
       },
 
-      grantTaskAccess(task) {
-        this.activeTask = task;
-        this.activeTask.users.push(this.activeUser._id);
-        this.SaveTask(true);
-        this.openTaskListWidget();
+      async grantTaskAccess(task) {
+        let response = await fetch(`http://localhost:6069/taskaccess?action=grant&task=${task._id}&user=${this.activeUser._id}`);
+        let data = await response.json();
+        
+        this.closeModal();
         this.reloadData();
       },
 
-      removeTaskAccess(task) {
-        this.activeTask = task;
-        this.activeTask.users.splice(this.activeTask.users.indexOf(this.activeUser._id), 1);
-        this.SaveTask(true);
+      async removeTaskAccess(task) {
+        let response = await fetch(`http://localhost:6069/taskaccess?action=revoke&task=${task._id}&user=${this.activeUser._id}`);
+        let data = await response.json();
+
+        this.closeModal();
         this.reloadData();
       },
 
       async getTaskUsers() {
+        console.log(this.activeTask);
         for (let id of this.activeTask.users) {
-          let response = await fetch(`http://localhost:6069/user?id=${id}`);
+          let response = await fetch(`http://localhost:6069/account?id=${id}`);
           let acc = await response.json();
-          this.activeTask.userNames.push(acc.username);
+          this.activeTask.userNames.push(CryptoJS.AES.decrypt(acc.username, this.cryptkey).toString(CryptoJS.enc.Utf8));
         }
       },
 
@@ -839,6 +1009,20 @@
         this.showModalBack = "none";
         this.showModalTask = "none";
         this.showModalUser = "none";
+        this.showModalTaskList = "none";
+      },
+
+      changeGanttDate(date) {
+        console.log(date);
+        this.ganttDates = [];
+        date = new Date(date);
+        date.setDate(date.getDate() - 4);
+
+        for (let i = 0; i < 11; i++) {
+          console.log(date);
+          this.ganttDates.push(new Date(date))
+          date.setDate(date.getDate() + 1);
+        }
       },
 
       dragMouseDown: function (event, ref) {
@@ -850,6 +1034,9 @@
 
         this.positions.startX = event.clientX;
         this.positions.startY = event.clientY;
+
+        this.positions.relativeX = event.clientX - this.$refs[this.activeRef][0].offsetLeft;
+        this.positions.relativeY = event.clientY - this.$refs[this.activeRef][0].offsetTop; 
 
         document.onmousemove = this.elementDrag;
         document.onmouseup = this.closeDragElement;
@@ -865,8 +1052,6 @@
           this.positions.clientX = event.clientX;
           this.positions.clientY = event.clientY;
 
-          this.positions.relativeX = event.clientX - this.$refs[this.activeRef][0].offsetLeft;
-          this.positions.relativeY = event.clientY - this.$refs[this.activeRef][0].offsetTop; 
         }
 
         this.positions.movementX = this.positions.clientX - event.clientX
@@ -883,9 +1068,10 @@
         document.onmouseup = null;
         document.onmousemove = null;
 
-        console.log(this.activeTask);
-        console.log(this.positions.clientX + " | " + this.positions.clientY)
         let taskNo = Number(this.activeRef.replace('task', ''));
+
+        this.positions.clientX = event.clientX
+        this.positions.clientY = event.clientY
         
         let prevState = this.activeTask.state;
 
@@ -898,7 +1084,6 @@
           newState = "Completed";
         }
 
-        console.log(newState + " | " + prevState)
         if (newState != prevState) {
           switch(prevState) {
             case "To Do":
@@ -927,16 +1112,43 @@
               break;
           }
 
-          console.log("save");
-          // this.SaveTask();
+          this.SaveTask();
 
         } else {
           this.openTaskModal(this.activeTask);
         }
 
-        this.$refs[this.activeRef][0].id = undefined;
+        this.$refs[this.activeRef][0].id = this.activeRef;
         this.$refs[this.activeRef][0].style.top = '';
         this.$refs[this.activeRef][0].style.left = '';
+      },
+
+      async forcePasswordReset() {
+        let response = await fetch(`http://localhost:6069/forcereset?user=${this.activeUser._id}`);
+      },
+
+      async resetPassword() {
+        if (this.password != this.twofa) {
+          let newPWord = CryptoJS.SHA3(this.twofa);
+          let response = await fetch(`http://localhost:6069/resetpassword?p=${newPWord}`);
+
+          this.openLogin();
+          this.response = "Please log in again using your new credentials";
+        } else {
+          this.response = "Your new password cannot match your old password";
+        }
+
+        this.reloadData();
+      },
+
+      async removeUser() {
+        if (this.activeUser._id == this.user._id) {
+          return;
+        }
+        let response = await fetch(`http://localhost:6069/deleteuser?user=${this.activeUser._id}`);
+        let data = await response.json();
+
+        this.reloadData();
       },
     },
   }
@@ -1007,6 +1219,7 @@ h2 {
   white-space: nowrap;
   text-overflow: ellipsis;
   padding: 5px;
+  display: inline-block;
 }
 
 #modal-user {
@@ -1022,6 +1235,15 @@ h2 {
 
 #modal-user > h1 {
   font-size: 35px;
+}
+
+.modal-user-button {
+  background-color: #EB8FAA; 
+  border-radius: 25px; 
+  padding: 5px;
+  display: inline-block;
+  border: none;
+  margin: 0 5%;
 }
 
 .modal-task-widget {
@@ -1178,7 +1400,8 @@ h2 {
 
 #login > label ,
 #register > label,
-#twofa > label {
+#twofa > label,
+#password-reset > label {
   padding: 0;
   background-color: inherit;
   display: inline-block;
@@ -1187,7 +1410,8 @@ h2 {
 
 #login > input,
 #register > input,
-#twofa > input {
+#twofa > input,
+#password-reset > input {
   width: 70%;
   height: 30px;
   padding: 1px 5px;
@@ -1209,6 +1433,16 @@ h2 {
 #twofa {
   display: v-bind("showTwoFA");
   width: 30%;
+  height: 200px;
+  margin: auto;
+  background-color: #fff;
+  padding: 1%;
+  border-radius: 15px;
+}
+
+#password-reset {
+  display: v-bind("showPasswordReset");
+  width: 35%;
   height: 200px;
   margin: auto;
   background-color: #fff;
@@ -1288,10 +1522,104 @@ h2 {
   text-overflow: ellipsis;
 }
 
+.kanban-widget-overdue {
+  background-color: #EB8FAA;
+  height: 100px;
+  border-radius: 5px;
+  padding: 15px;
+  font-size: 30px;
+  width: 90%;
+  margin: 20px 1% 0 1%;
+  overflow: hidden; 
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+
 #draggable-container {
   position: absolute;
   z-index: 2;
   width: 20%
+}
+
+#gantt-chart {
+  display: v-bind("showGantt");
+}
+
+#gantt-chart > li {
+  /* padding: 20px 0 0 0; */
+  border-width: 0 1px 0 0;
+  border-style: solid;
+  border-color: #333;
+  box-sizing: border-box;
+}
+
+#gantt-heading {
+  width: 100%;
+}
+
+.gantt-heading-column {
+  width: 10%;
+  display: inline-block;
+  text-align: center;
+  background-color: #79EBC6;
+  padding: 8px 0;
+  box-sizing: border-box;
+  border-width: 0 1px 0 0;
+  border-style: solid;
+  border-color: #333;
+}
+
+.gantt-row {
+  border-width: 0 1px 0 0;
+  border-style: solid;
+  border-color: #333;
+  display: inline-block;
+  width: 10%;
+  height: 60px;
+  box-sizing: border-box;
+  padding: 10px 0;
+  vertical-align: middle;
+}
+
+.gantt-bar {
+  background-color: #79EBC6;
+  width: 100%;
+  height: 40px;
+  box-sizing: border-box;
+  display: inline-block;
+  font-size: 28px;
+  padding: 5px 5px;
+  margin: 0;
+}
+
+.gantt-bar-start {
+  background-color: #79EBC6;
+  display: inline-block;
+  border-radius: 20px 0 0 20px;
+  width: 100%;
+  height: 40px;
+  font-size: 28px;
+  padding: 5px 10px;
+  box-sizing: border-box;
+}
+
+.gantt-bar-end {
+  background-color: #79EBC6;
+  display: inline-block;
+  border-radius: 0 20px 20px 0;
+  width: 100%;
+  height: 40px;
+  font-size: 28px;
+  box-sizing: border-box;
+}
+
+.gantt-bar-blank {
+  background-color: #fff;
+  width: 100%;
+  height: 40px;
+  box-sizing: border-box;
+  display: inline-block;
 }
 
 #admin-screen {
@@ -1317,11 +1645,13 @@ h2 {
 }
 
 .log-action {
-  width: 10%;
-  display: inline-block;
+  width: 15%;
+  display: inline-flex;
   overflow: hidden; 
   text-overflow: ellipsis;
-  text-align: center;
+  text-align: left;
+  padding: 0 5px;
+  font-size: 18px;
 }
 
 #modal-user-logs > .log-action {
@@ -1361,7 +1691,7 @@ h2 {
 
 .log-timestamp {
   display: inline-block;
-  width: 45%;
+  width: 40%;
   overflow: hidden; 
   text-overflow: ellipsis;
   text-align: right;

@@ -8,9 +8,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "14": "^3.1.6",
     "axios": "^1.6.0",
     "crypto-js": "^4.2.0",
     "moment": "^2.29.4",
+    "nvm": "^0.0.4",
     "vue": "^3.3.4",
     "vue-cryptojs": "^2.4.5"
   },
