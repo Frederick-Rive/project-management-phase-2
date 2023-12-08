@@ -62,10 +62,10 @@
         <br><br>
 
         <label for="password-reset-password">Enter old password</label>
-        <input id="password-reset-password" v-model="password" />
+        <input id="password-reset-password" type="password" v-model="password" />
         <br><br>
         <label for="password-reset-input">Enter new password</label>
-        <input id="password-reset-input" v-model="twofa" />
+        <input id="password-reset-input" type="password" v-model="twofa" />
 
         <br><p style="text-align: center;">{{ response }}</p><br>
         
@@ -138,8 +138,8 @@
               </div>
             </li>
           </div>
-          <button class="modal-user-button" @click.prevent="forcePasswordReset">Reset Password</button>
-          <button class="modal-user-button" @click.prevent="removeUser">Remove User</button>
+          <button class="modal-user-button" @click.self="forcePasswordReset()">Reset Password</button>
+          <button class="modal-user-button" @click.self="removeUser()">Remove User</button>
         </div>
       </div>
 
@@ -361,7 +361,7 @@
             <div class="account-widget" @click.self="openUserModal(account)">
               <img src="/src/img/pfp.jpeg" class="pfp" alt="Profile Picture" @click.self="openUserModal(account)">
               <p @click.self="openUserModal(account)">{{account.username}}</p>
-              <div class="account-remove" @click.self="removeUser">Remove</div>
+              <div class="account-remove" @click.self="removeUser()">Remove</div>
             </div>
           </li>
         </div>
@@ -401,7 +401,7 @@
         activeUser: {},
         account: null,
         uP: 0,
-        ganttDates: [new Date('2023-11-25'),new Date('2023-11-26'),new Date('2023-11-27'),new Date('2023-11-28'),new Date('2023-11-29'),new Date('2023-11-30'),new Date('2023-12-01'),new Date('2023-12-02'),new Date('2023-12-03'),new Date('2023-12-04')],
+        ganttDates: [new Date('2023-12-08'),new Date('2023-12-09'),new Date('2023-12-10'),new Date('2023-12-11'),new Date('2023-12-12'),new Date('2023-12-13'),new Date('2023-12-14'),new Date('2023-12-15'),new Date('2023-12-16'),new Date('2023-12-17')],
         showLogin: "none",
         showRegister: "none",
         showTwoFA: "none",
@@ -837,10 +837,7 @@
         this.logs = [];
         
         let response = await fetch(`http://localhost:6069/projectlogs`);
-        console.log('a');
         let l = await response.json();
-        console.log(l);
-        console.log('b')
 
         let logDict = {};
         for (let task of this.tasks) {
@@ -854,10 +851,8 @@
             if (logDict[log.task]) {
               log.taskName = logDict[log.task];
             } else {
-              console.log(log.task)
               let response = await fetch(`http://localhost:6069/task?id=${log.task}`);
               let task = await response.json();
-              console.log('c');
               if (task) {
                 log.taskName = CryptoJS.AES.decrypt(task.name, this.cryptkey).toString(CryptoJS.enc.Utf8);
                 logDict[log.task] = CryptoJS.AES.decrypt(task.name, this.cryptkey).toString(CryptoJS.enc.Utf8);
@@ -870,7 +865,6 @@
           if (logDict[log.user]) {
             log.userName = logDict[log.user];
           } else if (log.user) {
-            console.log(log.user)
             let response = await fetch(`http://localhost:6069/account?id=${log.user}`);
             let acc = await response.json();
             log.userName = CryptoJS.AES.decrypt(acc.username, this.cryptkey).toString(CryptoJS.enc.Utf8);
@@ -908,7 +902,6 @@
           for (let i = 0; i < this.tasks.length; i++) {
             console.log()
             if (this.tasks[i]._id == log.task) {
-              console.log('as');
               return this.openTaskModal(i);
             }
           }
@@ -982,7 +975,6 @@
         let response = await fetch(`http://localhost:6069/taskaccess?action=grant&task=${task._id}&user=${this.activeUser._id}`);
         let data = await response.json();
         
-        this.closeModal();
         this.reloadData();
       },
 
@@ -990,12 +982,10 @@
         let response = await fetch(`http://localhost:6069/taskaccess?action=revoke&task=${task._id}&user=${this.activeUser._id}`);
         let data = await response.json();
 
-        this.closeModal();
         this.reloadData();
       },
 
       async getTaskUsers() {
-        console.log(this.activeTask);
         for (let id of this.activeTask.users) {
           let response = await fetch(`http://localhost:6069/account?id=${id}`);
           let acc = await response.json();
@@ -1124,7 +1114,11 @@
       },
 
       async forcePasswordReset() {
+        console.log('aa');
         let response = await fetch(`http://localhost:6069/forcereset?user=${this.activeUser._id}`);
+
+        let data = await response.json();
+        console.log(data);
       },
 
       async resetPassword() {

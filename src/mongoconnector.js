@@ -65,13 +65,9 @@ var project = "655a0ace246914f44324c6e4";
 app.get('/account', async (req, res) => {
   if (req.query.u && req.query.u != "{}") {
     var account = await findAccount(req.query.u, req.query.h);
-    console.log(account);
     if (account != null) {
       account.password = null;
       perm = await checkPerm(account._id);
-      console.log(`Perm: ${perm}`);
-
-      console.log(account.resetrequired)
 
       if (account.resetrequired) {
         userPlaceholder = account;
@@ -119,7 +115,6 @@ app.get('/account', async (req, res) => {
       }
     } else {
       perm = 0;
-      console.log('aa');
       res.send("0");
     }
   } else if (req.query.id && req.query.id != "{}") {
@@ -148,7 +143,6 @@ app.get('/twofa', async (req, res) => {
     res.send(user);
   } else {
     twofaChecks++;
-    console.log(twofaChecks);
     if (twofaChecks == 5) {
       userPlaceholder == {};
       twofaCode == "";
@@ -164,7 +158,6 @@ app.get('/task', async (req, res) => {
   if (req.query.id && req.query.id != "{}") {
     var task = await findTask(req.query.id);
     if (task) {
-        console.log(task);
         res.send(task);
     } else {
       res.send("0");
@@ -211,9 +204,7 @@ app.patch('/task', async (req, res) => {
 })
 
 app.post('/account', async (req, res) => {
-  console.log(req.body)
   var accTest = await checkAccount(req.body.c);
-  console.log(accTest)
   if (accTest) {
     console.log("Name Taken");
     res.send('0');
@@ -227,10 +218,12 @@ app.post('/account', async (req, res) => {
         resetrequired: false,
       });
 
-      //logging action
-      postLog(null, 'Register');
+      await newAccount.save();
 
-      newAccount.save();
+      // logging action
+      // postLog(null, 'Register');
+
+      perm = 0;
 
       user = newAccount
       res.send(user);
@@ -274,14 +267,14 @@ app.get('/user', async (req, res) => {
 });
 
 app.get('/resetpassword', async (req, res) => {
-  console.log(req.query);
   let rtrn = await Account.findOneAndUpdate({"_id": userPlaceholder._id}, { resetrequired: false, password: req.query.p });
-  res.send(rtrn);
+  res.send("1");
 });
 
 app.get('/forcereset', async (req, res) => {
-  let rtrn = await Account.findOneAndUpdate({"_id": req.query.user}, { passwordreset: true });
-  res.send(rtrn);
+  let rtrn = await Account.findOneAndUpdate({"_id": req.query.user}, { resetrequired: true });
+  console.log(rtrn);
+  res.send("1");
 });
 
 app.get('/deleteuser', async (req, res) => {
@@ -290,9 +283,8 @@ app.get('/deleteuser', async (req, res) => {
 });
 
 app.get('/uP', async (req, res) => {
-  console.log(user._id);
+
   if (user._id != undefined) {
-    console.log(perm);
     res.send(perm.toString());
   } else {
     res.send("0");
@@ -320,7 +312,6 @@ app.get('/projectusers', async (req, res) => {
         let userPerm = await checkPerm (users[i]._id)
         users[i].perm = userPerm;
       }
-      console.log(users);
       res.send(users);
     } else {
       res.send("0");
@@ -381,7 +372,6 @@ app.get('/backup', async(req, res) => {
       }
       res.send("1");
     } else if (req.query.order == "Load") {
-      console.log('aa');
       let backupTasks = await TaskBackup.find();
       let backupLogs = await LogBackup.find();
 
@@ -433,7 +423,6 @@ function findAccount(uName, pHash) {
     return (accountResult);
   })
   .catch((err) => {
-    console.log('a');
     return ("Error: " + err);
   })
 }
@@ -453,7 +442,6 @@ function checkAccount(uName) {
   return Account.findOne({ usernameHash: uName })
   .exec()
   .then((accountResult) => {
-    console.log(accountResult)
     if (accountResult != null) {
       return true;
     } else {
@@ -609,7 +597,6 @@ function qObj (id) {
 }
 
 function checkPerm (id) {
-  console.log({"_id": project, "admin": id});
   return Project.findOne({"_id": project, "admin": id})
   .exec()
   .then((projectResult) => {
